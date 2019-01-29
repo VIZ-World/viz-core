@@ -181,6 +181,14 @@ if( options.count(name) ) { \
             impacted.insert(op.curator);
         }
 
+        void operator()(const receive_award_operation& op) {
+            impacted.insert(op.receiver);
+        }
+
+        void operator()(const benefactor_award_operation& op) {
+            impacted.insert(op.benefactor);
+        }
+
         void operator()(const transfer_operation& op) {
             impacted.insert(op.from);
             impacted.insert(op.to);
