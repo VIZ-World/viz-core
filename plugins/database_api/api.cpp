@@ -241,12 +241,39 @@ optional<signed_block> plugin::api_impl::get_block(uint32_t block_num) const {
 DEFINE_API(plugin, set_block_applied_callback) {
     CHECK_ARG_SIZE(1)
 
+    // Use default value in case of converting errors to preserve
+    // previous HF behaviour, where 1st argument can be any integer
+    block_applied_callback_result_type type = block;
+    auto arg = args.args->at(0);
+    try {
+        type = arg.as<block_applied_callback_result_type>();
+    } catch (...) {
+        ilog("Bad argument (${a}) passed to set_block_applied_callback, using default", ("a",arg));
+    }
+
     // Delegate connection handlers to callback
     msg_pack_transfer transfer(args);
 
     my->database().with_weak_read_lock([&]{
-        my->set_block_applied_callback([msg = transfer.msg()](const fc::variant & block_header) {
-            msg->unsafe_result(fc::variant(block_header));
+        my->set_block_applied_callback([this,type,msg = transfer.msg()](const signed_block& block) {
+            fc::variant r;
+            switch (type) {
+                case block_applied_callback_result_type::block:
+                    r = fc::variant(block);
+                    break;
+                case header:
+                    r = fc::variant(block_header(block));
+                    break;
+                case virtual_ops:
+                    r = fc::variant(virtual_operations(block.block_num(), my->get_block_vops()));
+                    break;
+                case full:
+                    r = fc::variant(annotated_signed_block(block, my->get_block_vops()));
+                    break;
+                default:
+                    break;
+            }
+            msg->unsafe_result(r);
         });
     });
 
