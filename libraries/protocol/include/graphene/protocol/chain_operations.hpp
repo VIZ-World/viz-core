@@ -345,6 +345,7 @@ namespace graphene { namespace protocol {
 
         struct chain_properties_hf4;
         struct chain_properties_hf6;
+        struct chain_properties_hf9;
 
         /**
          * Witnesses must vote on how to set certain chain properties to ensure a smooth
@@ -436,6 +437,7 @@ namespace graphene { namespace protocol {
             chain_properties_init& operator=(const chain_properties_init&) = default;
             chain_properties_init& operator=(const chain_properties_hf4& src);
             chain_properties_init& operator=(const chain_properties_hf6& src);
+            chain_properties_init& operator=(const chain_properties_hf9& src);
         };
 
         struct chain_properties_hf4: public chain_properties_init {
@@ -510,6 +512,71 @@ namespace graphene { namespace protocol {
             chain_properties_hf6& operator=(const chain_properties_hf6&) = default;
         };
 
+         struct chain_properties_hf9: public chain_properties_hf6 {
+            /**
+             *  Consensus - Minimum amount of tokens to create an invite
+             */
+            asset create_invite_min_balance = asset(CONSENSUS_CREATE_INVITE_MIN_BALANCE, TOKEN_SYMBOL);
+
+            /**
+             *  Consensus - Fee to the network committee for create request to committee for review
+             */
+            asset committee_create_request_fee = asset(CONSENSUS_COMMITTEE_CREATE_REQUEST_FEE, TOKEN_SYMBOL);
+
+            /**
+             *  Consensus - Fee to the network committee for create paid subscription
+             */
+            asset create_paid_subscription_fee = asset(CONSENSUS_CREATE_PAID_SUBSCRIPTION_FEE, TOKEN_SYMBOL);
+
+            /**
+             *  Consensus - Fee to the network committee for setting account on sale
+             */
+            asset account_on_sale_fee = asset(CONSENSUS_ACCOUNT_ON_SALE_FEE, TOKEN_SYMBOL);
+
+            /**
+             *  Consensus - Fee to the network committee for setting subaccounts on sale
+             */
+            asset subaccount_on_sale_fee = asset(CONSENSUS_SUBACCOUNT_ON_SALE_FEE, TOKEN_SYMBOL);
+
+            /**
+             *  Consensus - Fee to the network committee for declare account as witness
+             */
+            asset witness_declaration_fee = asset(CONSENSUS_WITNESS_DECLARATION_FEE, TOKEN_SYMBOL);
+
+            void validate() const {
+                chain_properties_hf6::validate();
+                FC_ASSERT(create_invite_min_balance.amount > 0);
+                FC_ASSERT(create_invite_min_balance.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(committee_create_request_fee.amount > 0);
+                FC_ASSERT(committee_create_request_fee.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(create_paid_subscription_fee.amount > 0);
+                FC_ASSERT(create_paid_subscription_fee.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(account_on_sale_fee.amount > 0);
+                FC_ASSERT(account_on_sale_fee.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(subaccount_on_sale_fee.amount > 0);
+                FC_ASSERT(subaccount_on_sale_fee.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(witness_declaration_fee.amount > 0);
+                FC_ASSERT(witness_declaration_fee.symbol == TOKEN_SYMBOL);
+            }
+
+            chain_properties_hf9& operator=(const chain_properties_init& src) {
+                chain_properties_init::operator=(src);
+                return *this;
+            }
+
+            chain_properties_hf9& operator=(const chain_properties_hf4& src) {
+                chain_properties_hf4::operator=(src);
+                return *this;
+            }
+
+            chain_properties_hf9& operator=(const chain_properties_hf6& src) {
+                chain_properties_hf6::operator=(src);
+                return *this;
+            }
+
+            chain_properties_hf9& operator=(const chain_properties_hf9&) = default;
+        };
+
         inline chain_properties_init& chain_properties_init::operator=(const chain_properties_hf4& src) {
             account_creation_fee = src.account_creation_fee;
             maximum_block_size = src.maximum_block_size;
@@ -542,10 +609,27 @@ namespace graphene { namespace protocol {
             return *this;
         }
 
+        inline chain_properties_init& chain_properties_init::operator=(const chain_properties_hf9& src) {
+            account_creation_fee = src.account_creation_fee;
+            maximum_block_size = src.maximum_block_size;
+            create_account_delegation_ratio = src.create_account_delegation_ratio;
+            create_account_delegation_time = src.create_account_delegation_time;
+            min_delegation = src.min_delegation;
+            max_curation_percent = src.max_curation_percent;
+            min_curation_percent = src.min_curation_percent;
+            bandwidth_reserve_percent = src.bandwidth_reserve_percent;
+            bandwidth_reserve_below = src.bandwidth_reserve_below;
+            flag_energy_additional_cost = src.flag_energy_additional_cost;
+            vote_accounting_min_rshares = src.vote_accounting_min_rshares;
+            committee_request_approve_min_percent = src.committee_request_approve_min_percent;
+            return *this;
+        }
+
         using versioned_chain_properties = fc::static_variant<
             chain_properties_init,
             chain_properties_hf4,
-            chain_properties_hf6
+            chain_properties_hf6,
+            chain_properties_hf9
         >;
 
         /**
@@ -992,6 +1076,9 @@ FC_REFLECT_DERIVED(
 FC_REFLECT_DERIVED(
     (graphene::protocol::chain_properties_hf6),((graphene::protocol::chain_properties_hf4)),
     (data_operations_cost_additional_bandwidth)(witness_miss_penalty_percent)(witness_miss_penalty_duration))
+FC_REFLECT_DERIVED(
+    (graphene::protocol::chain_properties_hf9),((graphene::protocol::chain_properties_hf6)),
+    (create_invite_min_balance)(committee_create_request_fee)(create_paid_subscription_fee)(account_on_sale_fee)(subaccount_on_sale_fee)(witness_declaration_fee))
 
 FC_REFLECT_TYPENAME((graphene::protocol::versioned_chain_properties))
 
