@@ -31,6 +31,7 @@
 #define CHAIN_MAX_WITNESS_MISSED_BLOCKS       200 // ~10 min after first missed block for top witness
 
 #define CHAIN_INITIATOR_NAME                 "viz"
+// Private key: 5JabcrvaLnBTCkCVFX5r4rmeGGfuJuVp4NAKRNLTey6pxhRQmf4
 #define CHAIN_INITIATOR_PUBLIC_KEY_STR       "VIZ6MyX5QiXAXRZk7SYCiqpi6Mtm8UbHWDFSV8HPpt7FJyahCnc2T"
 #define CHAIN_INITIATOR_PUBLIC_KEY            (graphene::protocol::public_key_type(CHAIN_INITIATOR_PUBLIC_KEY_STR))
 #define CHAIN_NUM_INITIATORS                  0
