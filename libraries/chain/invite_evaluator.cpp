@@ -14,7 +14,12 @@ namespace graphene { namespace chain {
         FC_ASSERT(creator.balance >= o.balance, "Insufficient balance to create invite.",
                         ("creator.balance", creator.balance)("invite.balance", o.balance));
         FC_ASSERT(o.invite_key != public_key_type(), "Invite key cannot be blank.");
-        FC_ASSERT(o.balance >= median_props.account_creation_fee, "Invite balance must be more or equal consensus account_creation_fee.");
+        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+            FC_ASSERT(o.balance >= median_props.create_invite_min_balance, "Invite balance must be more or equal consensus create_invite_min_balance.");
+        }
+        else{
+            FC_ASSERT(o.balance >= median_props.account_creation_fee, "Invite balance must be more or equal consensus account_creation_fee.");
+        }
 
         const auto &idx = _db.get_index<invite_index>().indices().get<by_invite_key>();
         auto itr = idx.find(o.invite_key);
@@ -72,27 +77,27 @@ namespace graphene { namespace chain {
         FC_ASSERT(itr != idx.end(), "Invite was not found.");
 
         if(itr->status == 0){
-        	public_key_type key_from_operation(o.new_account_key);
+            public_key_type key_from_operation(o.new_account_key);
 
-        	_db.create<account_object>([&](account_object &acc) {
-        	    acc.name = o.new_account_name;
-        	    acc.memo_key = key_from_operation;
-        	    acc.created = _db.head_block_time();
-        	    acc.recovery_account = itr->creator;
-        	    acc.referrer = itr->creator;
-        	});
-        	_db.create<account_authority_object>([&](account_authority_object &auth) {
-        	    auth.account = o.new_account_name;
-        	    auth.master.add_authority(key_from_operation, 1);
-        	    auth.master.weight_threshold = 1;
-        	    auth.active = auth.master;
-        	    auth.regular = auth.active;
-        	});
-        	_db.create<account_metadata_object>([&](account_metadata_object& m) {
-        	    m.account = o.new_account_name;
-        	});
-        	const auto &new_account = _db.get_account(o.new_account_name);
-        	_db.create_vesting(new_account, itr->balance);
+            _db.create<account_object>([&](account_object &acc) {
+                acc.name = o.new_account_name;
+                acc.memo_key = key_from_operation;
+                acc.created = _db.head_block_time();
+                acc.recovery_account = itr->creator;
+                acc.referrer = itr->creator;
+            });
+            _db.create<account_authority_object>([&](account_authority_object &auth) {
+                auth.account = o.new_account_name;
+                auth.master.add_authority(key_from_operation, 1);
+                auth.master.weight_threshold = 1;
+                auth.active = auth.master;
+                auth.regular = auth.active;
+            });
+            _db.create<account_metadata_object>([&](account_metadata_object& m) {
+                m.account = o.new_account_name;
+            });
+            const auto &new_account = _db.get_account(o.new_account_name);
+            _db.create_vesting(new_account, itr->balance);
             _db.modify(*itr, [&](invite_object& c) {
                 c.status = 2;
                 from_string(c.invite_secret, o.invite_secret);

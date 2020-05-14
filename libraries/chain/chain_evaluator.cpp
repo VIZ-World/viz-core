@@ -1541,6 +1541,20 @@ namespace graphene { namespace chain {
         void set_account_price_evaluator::do_apply(const set_account_price_operation& op) {
             const auto& account = _db.get_account(op.account);
             const auto& account_seller = _db.get_account(op.account_seller);
+            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                if(""==account.account_seller){
+                    const auto& median_props = _db.get_witness_schedule_object().median_props;
+                    const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                    FC_ASSERT(account.balance >=
+                              median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
+
+                    _db.adjust_balance(account, -median_props.account_on_sale_fee);
+                    _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                        dgp.committee_fund += median_props.account_on_sale_fee;
+                    });
+                }
+            }
             _db.modify(account, [&](account_object& a) {
                 a.account_seller = op.account_seller;
                 a.account_offer_price = op.account_offer_price;
@@ -1551,6 +1565,20 @@ namespace graphene { namespace chain {
         void set_subaccount_price_evaluator::do_apply(const set_subaccount_price_operation& op) {
             const auto& account = _db.get_account(op.account);
             const auto& subaccount_seller = _db.get_account(op.subaccount_seller);
+            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                if(""==account.subaccount_seller){
+                    const auto& median_props = _db.get_witness_schedule_object().median_props;
+                    const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                    FC_ASSERT(account.balance >=
+                              median_props.subaccount_on_sale_fee, "Account does not have sufficient funds to place subaccount for sale: required ${a}.",("a",median_props.subaccount_on_sale_fee));
+
+                    _db.adjust_balance(account, -median_props.subaccount_on_sale_fee);
+                    _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                        dgp.committee_fund += median_props.subaccount_on_sale_fee;
+                    });
+                }
+            }
             _db.modify(account, [&](account_object& a) {
                 a.subaccount_seller = op.subaccount_seller;
                 a.subaccount_offer_price = op.subaccount_offer_price;

@@ -1748,6 +1748,14 @@ namespace graphene { namespace chain {
                 calc_median(&chain_properties_hf6::witness_miss_penalty_percent);
                 calc_median(&chain_properties_hf6::witness_miss_penalty_duration);
             }
+            if(has_hardfork(CHAIN_HARDFORK_9)){
+                calc_median(&chain_properties_hf9::create_invite_min_balance);
+                calc_median(&chain_properties_hf9::committee_create_request_fee);
+                calc_median(&chain_properties_hf9::create_paid_subscription_fee);
+                calc_median(&chain_properties_hf9::account_on_sale_fee);
+                calc_median(&chain_properties_hf9::subaccount_on_sale_fee);
+                calc_median(&chain_properties_hf9::witness_declaration_fee);
+            }
 
             modify(wso, [&](witness_schedule_object &_wso) {
                 _wso.median_props = median_props;
@@ -3661,6 +3669,9 @@ namespace graphene { namespace chain {
             _hardfork_times[CHAIN_HARDFORK_8] = fc::time_point_sec(CHAIN_HARDFORK_8_TIME);
             _hardfork_versions[CHAIN_HARDFORK_8] = CHAIN_HARDFORK_8_VERSION;
 
+            _hardfork_times[CHAIN_HARDFORK_9] = fc::time_point_sec(CHAIN_HARDFORK_9_TIME);
+            _hardfork_versions[CHAIN_HARDFORK_9] = CHAIN_HARDFORK_9_VERSION;
+
             const auto &hardforks = get_hardfork_property_object();
             FC_ASSERT(
                 hardforks.last_hardfork <= CHAIN_NUM_HARDFORKS,
@@ -4459,6 +4470,10 @@ namespace graphene { namespace chain {
                             a.delegated_vesting_shares += itr->vesting_shares;
                         });
                     }
+                    break;
+                }
+                case CHAIN_HARDFORK_9:
+                {
                     break;
                 }
                 default:
