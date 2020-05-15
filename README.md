@@ -14,7 +14,7 @@ dockerized container.  Both common binary types are included.
 To run a p2p node (ca. 2GB of memory is required at the moment):
 
     docker run \
-        -d -p 2001:2001 -p 8090:8090 --name viz-default \
+        -d -p 2001:2001 -p 8090:8090 -p 8091:8091 --name viz-default \
         viz-world/viz-world
 
     docker logs -f viz-default  # follow along
@@ -27,3 +27,17 @@ A list of some seed nodes to get you started can be found in
 This same file is baked into the docker images and can be overridden by
 setting `VIZD_SEED_NODES` in the container environment at `docker run`
 time to a whitespace delimited list of seed nodes (with port).
+
+## Building docker images manually
+
+Production:
+
+```
+docker build -t viz:latest -f share/vizd/docker/Dockerfile-production .
+```
+
+Testnet + keep intermediate build containers for debugging:
+
+```
+docker build --rm=false -t viz:testnet -f share/vizd/docker/Dockerfile-testnet .
+```
