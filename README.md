@@ -1,5 +1,7 @@
 # Introducing VIZ
 
+![Docker Build Status](https://img.shields.io/docker/build/vizblockchain/vizd)
+
 VIZ is a DPOS blockchain with an unproven consensus algorithm (Fair DPOS with witness penalty for missing block).
 
 ## Building
@@ -9,15 +11,22 @@ compile-time options, and specific commands for Linux (Ubuntu LTS) or macOS X.
 
 ## Running in docker
 
-Just want to get up and running quickly?  Try deploying a prebuilt
-dockerized container.  Both common binary types are included.
-To run a p2p node (ca. 2GB of memory is required at the moment):
+Auto-built image [vizblockchain/vizd](https://hub.docker.com/r/vizblockchain/vizd) is available at docker hub.
 
-    docker run \
-        -d -p 2001:2001 -p 8090:8090 -p 8091:8091 --name viz-default \
-        viz-world/viz-world
+Docker image tags:
 
-    docker logs -f viz-default  # follow along
+* **latest** - built from master branch, used to run production VIZ network
+* **testnet** - built from master branch, could be used to run [local test network](documentation/testnet.md)
+
+Example run:
+
+```
+docker run \
+    -d -p 2001:2001 -p 8090:8090 -p 8091:8091 --name vizd \
+    vizblockchain/vizd:latest
+
+docker logs -f vizd
+```
 
 ## Seed Nodes
 
