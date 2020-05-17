@@ -23,7 +23,7 @@
 #define CHAIN_ACCOUNT_RECOVERY_REQUEST_EXPIRATION_PERIOD  fc::days(1)
 #define CHAIN_MASTER_UPDATE_LIMIT                         fc::seconds(60)
 
-#define CHAIN_BLOCK_INTERVAL                  3
+#define CHAIN_BLOCK_INTERVAL                  1
 #define CHAIN_BLOCK_WITNESS_REPEAT            1
 #define CHAIN_BLOCKS_PER_YEAR                 (365*24*60*60/CHAIN_BLOCK_INTERVAL)
 #define CHAIN_BLOCKS_PER_DAY                  (24*60*60/CHAIN_BLOCK_INTERVAL)
@@ -35,9 +35,9 @@
 #define CHAIN_INITIATOR_PUBLIC_KEY_STR       "VIZ6MyX5QiXAXRZk7SYCiqpi6Mtm8UbHWDFSV8HPpt7FJyahCnc2T"
 #define CHAIN_INITIATOR_PUBLIC_KEY            (graphene::protocol::public_key_type(CHAIN_INITIATOR_PUBLIC_KEY_STR))
 #define CHAIN_NUM_INITIATORS                  0
-#define CHAIN_MAX_TOP_WITNESSES               11
-#define CHAIN_MAX_SUPPORT_WITNESSES           10
-#define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES) /// 21 is more than enough
+#define CHAIN_MAX_TOP_WITNESSES               1
+#define CHAIN_MAX_SUPPORT_WITNESSES           0
+#define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES)
 #define CHAIN_HARDFORK_REQUIRED_WITNESSES     1
 #define CHAIN_MAX_TIME_UNTIL_EXPIRATION       (60*60) // seconds,  aka: 1 hour
 #define CHAIN_MAX_PROXY_RECURSION_DEPTH       4
