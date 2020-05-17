@@ -1,6 +1,10 @@
 #pragma once
 
+#ifdef BUILD_TESTNET
+#include <graphene/protocol/config_testnet.hpp>
+#else
 #include <graphene/protocol/config.hpp>
+#endif
 #include <fc/fixed_string.hpp>
 
 #include <fc/container/flat_fwd.hpp>
