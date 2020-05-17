@@ -38,7 +38,6 @@ COPY libraries $APPDIR/libraries
 
 RUN \
     cd $APPDIR && \
-    git reset --hard && \
     git submodule deinit -f . && \
     git submodule update --init --recursive -f && \
     mkdir build && \
