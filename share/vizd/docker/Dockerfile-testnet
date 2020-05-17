@@ -67,6 +67,7 @@ RUN set -xe ;\
     chown vizd:vizd -R /var/cache/vizd
 
 COPY share/vizd/vizd.sh /etc/service/vizd/run
+COPY share/vizd/snapshot-testnet.json /var/lib/vizd
 COPY share/vizd/config/config_testnet.ini /etc/vizd/config.ini
 
 # rpc services:

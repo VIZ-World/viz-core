@@ -1,0 +1,34 @@
+{
+  "accounts": [
+    {
+      "login":"alice",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    },
+    {
+      "login":"bob",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    },
+    {
+      "login":"charlie",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    },
+    {
+      "login":"chuck",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    },
+    {
+      "login":"dan",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    },
+    {
+      "login":"frank",
+      "public_key":"VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8",
+      "shares_amount":"100000000"
+    }
+  ]
+}

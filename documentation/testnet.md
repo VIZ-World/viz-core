@@ -21,3 +21,19 @@ Initial users and their keys are defined inside *libraries/protocol/include/grap
 ## Launch
 
 To run a testnet node, please use Dockerfile-testnet.
+
+## Additional users
+
+To easy testing, several additional users immediately availabe:
+
+* alice
+* bob
+* charlie
+* chuck
+* dan
+* frank
+
+All users have the same keys:
+
+* private: 5J9DBCRX5D2ZUUuy9qV2ef9p5sfA3ydHsDs2G531bob7wbEigDJ
+* public: VIZ5zTAE2hiGcqYaDTQeEBqTtPeoWtSNjpznwmbvqJXesrK1Qn3e8
