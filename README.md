@@ -1,6 +1,6 @@
 # Introducing VIZ
 
-![Docker Build Status](https://img.shields.io/docker/build/vizblockchain/vizd)
+![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/vizblockchain/vizd)
 
 VIZ is a DPOS blockchain with an unproven consensus algorithm (Fair DPOS with witness penalty for missing block).
 
