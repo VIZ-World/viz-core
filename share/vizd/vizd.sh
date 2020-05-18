@@ -16,7 +16,7 @@ ARGS=""
 # seed nodes, use the ones above:
 if [[ -z "$VIZD_SEED_NODES" ]]; then
     for NODE in $SEED_NODES ; do
-        ARGS+=" --seed-node=$NODE"
+        ARGS+=" --p2p-seed-node=$NODE"
     done
 fi
 
@@ -24,7 +24,7 @@ fi
 # the ones the user specified:
 if [[ ! -z "$VIZD_SEED_NODES" ]]; then
     for NODE in $VIZD_SEED_NODES ; do
-        ARGS+=" --seed-node=$NODE"
+        ARGS+=" --p2p-seed-node=$NODE"
     done
 fi
 

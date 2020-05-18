@@ -1,7 +1,11 @@
 #include <graphene/plugins/follow/follow_objects.hpp>
 #include <graphene/plugins/follow/follow_operations.hpp>
 #include <graphene/plugins/follow/follow_evaluators.hpp>
+#ifdef BUILD_TESTNET
+#include <graphene/protocol/config_testnet.hpp>
+#else
 #include <graphene/protocol/config.hpp>
+#endif
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/generic_custom_operation_interpreter.hpp>
 #include <graphene/chain/operation_notification.hpp>

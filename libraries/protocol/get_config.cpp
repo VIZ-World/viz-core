@@ -1,5 +1,9 @@
 #include <graphene/protocol/get_config.hpp>
+#ifdef BUILD_TESTNET
+#include <graphene/protocol/config_testnet.hpp>
+#else
 #include <graphene/protocol/config.hpp>
+#endif
 #include <graphene/protocol/asset.hpp>
 #include <graphene/protocol/version.hpp>
 

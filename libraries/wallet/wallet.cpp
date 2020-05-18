@@ -3,11 +3,15 @@
 #include <graphene/utilities/words.hpp>
 
 #include <graphene/protocol/base.hpp>
+#ifdef BUILD_TESTNET
+#include <graphene/protocol/config_testnet.hpp>
+#else
+#include <graphene/protocol/config.hpp>
+#endif
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/wallet/api_documentation.hpp>
 #include <graphene/wallet/reflect_util.hpp>
 #include <graphene/wallet/remote_node_api.hpp>
-#include <graphene/protocol/config.hpp>
 #include <graphene/plugins/follow/follow_operations.hpp>
 
 #include <algorithm>

@@ -5,7 +5,7 @@
 #define CHAIN_VERSION                         (version(2, 4, 0))
 #define CHAIN_HARDFORK_VERSION                (hardfork_version(CHAIN_VERSION))
 
-#define CHAIN_NAME                            "VIZ"
+#define CHAIN_NAME                            "VIZTEST"
 #define CHAIN_ID                              (fc::sha256::hash(CHAIN_NAME))
 #define CHAIN_ADDRESS_PREFIX                  "VIZ"
 
@@ -19,11 +19,11 @@
 
 #define CHAIN_MIN_ACCOUNT_CREATION_FEE        1000
 
-#define CHAIN_MASTER_AUTH_RECOVERY_PERIOD                 fc::days(30)
+#define CHAIN_MASTER_AUTH_RECOVERY_PERIOD                 fc::minutes(2)
 #define CHAIN_ACCOUNT_RECOVERY_REQUEST_EXPIRATION_PERIOD  fc::days(1)
-#define CHAIN_MASTER_UPDATE_LIMIT                         fc::minutes(60)
+#define CHAIN_MASTER_UPDATE_LIMIT                         fc::seconds(60)
 
-#define CHAIN_BLOCK_INTERVAL                  3
+#define CHAIN_BLOCK_INTERVAL                  1
 #define CHAIN_BLOCK_WITNESS_REPEAT            1
 #define CHAIN_BLOCKS_PER_YEAR                 (365*24*60*60/CHAIN_BLOCK_INTERVAL)
 #define CHAIN_BLOCKS_PER_DAY                  (24*60*60/CHAIN_BLOCK_INTERVAL)
@@ -35,16 +35,16 @@
 #define CHAIN_INITIATOR_PUBLIC_KEY_STR       "VIZ6MyX5QiXAXRZk7SYCiqpi6Mtm8UbHWDFSV8HPpt7FJyahCnc2T"
 #define CHAIN_INITIATOR_PUBLIC_KEY            (graphene::protocol::public_key_type(CHAIN_INITIATOR_PUBLIC_KEY_STR))
 #define CHAIN_NUM_INITIATORS                  0
-#define CHAIN_MAX_TOP_WITNESSES               11
-#define CHAIN_MAX_SUPPORT_WITNESSES           10
-#define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES) /// 21 is more than enough
-#define CHAIN_HARDFORK_REQUIRED_WITNESSES     17 // 17 of the 20 dpos witnesses (19 elected and 1 virtual time) required for hardfork. This guarantees 75% participation on all subsequent rounds.
+#define CHAIN_MAX_TOP_WITNESSES               1
+#define CHAIN_MAX_SUPPORT_WITNESSES           0
+#define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES)
+#define CHAIN_HARDFORK_REQUIRED_WITNESSES     1
 #define CHAIN_MAX_TIME_UNTIL_EXPIRATION       (60*60) // seconds,  aka: 1 hour
 #define CHAIN_MAX_PROXY_RECURSION_DEPTH       4
-#define CHAIN_VESTING_WITHDRAW_INTERVALS      28
-#define CHAIN_VESTING_WITHDRAW_INTERVAL_SECONDS (60*60*24) // 1 day per interval
+#define CHAIN_VESTING_WITHDRAW_INTERVALS      60
+#define CHAIN_VESTING_WITHDRAW_INTERVAL_SECONDS (1) // 1 day per interval
 #define CHAIN_MAX_WITHDRAW_ROUTES             10
-#define CHAIN_ENERGY_REGENERATION_SECONDS     (5*60*60*24) // 5 days
+#define CHAIN_ENERGY_REGENERATION_SECONDS     120
 #define CHAIN_MAX_VOTE_CHANGES                5
 #define CHAIN_MAX_COMMENT_BENEFICIARIES       64
 #define CHAIN_VOTE_ENERGY_RATE                1
@@ -67,7 +67,7 @@
 
 #define CHAIN_REWARD_FUND_CURATOR_PERCENT     (5*100/30*CHAIN_1_PERCENT) //5% of inflation from reward fund
 
-#define CHAIN_BANDWIDTH_AVERAGE_WINDOW_SECONDS (60*60*24*7) ///< 1 week
+#define CHAIN_BANDWIDTH_AVERAGE_WINDOW_SECONDS (60*60*24) ///< 1 week
 #define CHAIN_BANDWIDTH_PRECISION             1000000ll ///< 1 million
 #define CONSENSUS_BANDWIDTH_RESERVE_PERCENT   (CHAIN_100_PERCENT/10) // 10%
 #define CONSENSUS_BANDWIDTH_RESERVE_BELOW     int64_t(500000000) // 500 SHARES AMOUNT
@@ -107,11 +107,11 @@
 #define CHAIN_IRREVERSIBLE_THRESHOLD          (75 * CHAIN_1_PERCENT)
 /** Irreversibility only counts blocks produced if wit.current_run >= CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN */
 #define CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN    2
-#define COMMITTEE_MIN_DURATION                (60*60*24*5)
+#define COMMITTEE_MIN_DURATION                (1)
 #define COMMITTEE_MAX_DURATION                (60*60*24*30)
 #define COMMITTEE_MAX_REQUIRED_AMOUNT         int64_t(CHAIN_INIT_SUPPLY/100)
-#define COMMITTEE_REQUEST_PER_TIME            (60*60*24)
-#define COMMITTEE_REQUEST_PROCESSING          (CHAIN_BLOCKS_PER_HOUR/6) //every 10 minutes
+#define COMMITTEE_REQUEST_PER_TIME            (60)
+#define COMMITTEE_REQUEST_PROCESSING          (CHAIN_BLOCKS_PER_HOUR/60) //every 10 minutes
 
 #define CONSENSUS_FLAG_ENERGY_ADDITIONAL_COST 0
 #define CONSENSUS_VOTE_ACCOUNTING_MIN_RSHARES uint32_t(5000000) // default 0.5 SHARES equivalent

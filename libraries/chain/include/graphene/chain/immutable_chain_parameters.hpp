@@ -4,7 +4,11 @@
 
 #include <cstdint>
 
+#ifdef BUILD_TESTNET
+#include <graphene/protocol/config_testnet.hpp>
+#else
 #include <graphene/protocol/config.hpp>
+#endif
 
 namespace graphene {
     namespace chain {
