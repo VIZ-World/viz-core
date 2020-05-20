@@ -3200,6 +3200,9 @@ namespace graphene { namespace chain {
                 clear_expired_proposals();
                 clear_expired_transactions();
                 clear_expired_delegations();
+                if(has_hardfork(CHAIN_HARDFORK_9)){
+                    clear_used_invites();
+                }
                 update_bandwidth_reserve_candidates();
                 update_witness_schedule();
 
@@ -3598,6 +3601,20 @@ namespace graphene { namespace chain {
                 push_virtual_operation(return_vesting_delegation_operation(itr->delegator, itr->vesting_shares));
                 remove(*itr);
                 itr = delegations_by_exp.begin();
+            }
+        }
+
+        void database::clear_used_invites() {
+            auto remove_time = head_block_time() - CHAIN_CLEAR_USED_INVITE_DELAY;
+            const auto& invites_idx = get_index<invite_index, by_status>();
+            auto itr = invites_idx.begin();
+            auto itr = invites_idx.lower_bound(1);
+            while (itr != invites_idx.end() && itr->status != 0){
+                const auto &cur_invite = *itr;
+                ++itr;
+                if(remove_time > cur_invite.claim_time){
+                    _db.remove(cur_invite);
+                }
             }
         }
 
