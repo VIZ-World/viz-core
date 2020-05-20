@@ -3202,6 +3202,7 @@ namespace graphene { namespace chain {
                 clear_expired_delegations();
                 if(has_hardfork(CHAIN_HARDFORK_9)){
                     clear_used_invites();
+                    clear_closed_committee_requests();
                 }
                 update_bandwidth_reserve_candidates();
                 update_witness_schedule();
@@ -3614,6 +3615,32 @@ namespace graphene { namespace chain {
                 ++itr;
                 if(remove_time > cur_invite.claim_time){
                     _db.remove(cur_invite);
+                }
+            }
+        }
+
+        void database::clear_closed_committee_requests() {
+            auto remove_time = head_block_time() - CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY;
+            const auto& requests_idx = get_index<committee_request_index, by_status>();
+            auto itr = requests_idx.begin();
+            auto itr = requests_idx.lower_bound(1);
+            while (itr != requests_idx.end() && itr->status != 0){
+                const auto &cur_request = *itr;
+                ++itr;
+                if(4 != cur_request.status){
+                    if(5 != cur_request.status){
+                        if(remove_time > cur_request.conclusion_time){
+                            const auto& votes_idx = get_index<committee_vote_index>().indices().get<by_request_id>();
+                            auto votes_itr = votes_idx.lower_bound(cur_request.request_id);
+                            while(votes_itr != votes_idx.end() &&
+                                   votes_itr->request_id == cur_request.request_id) {
+                                const auto &cur_vote = *votes_itr;
+                                ++votes_itr;
+                                remove(cur_vote);
+                            }
+                            _db.remove(cur_request);
+                        }
+                    }
                 }
             }
         }

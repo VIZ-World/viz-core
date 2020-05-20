@@ -24,6 +24,7 @@
 #define CHAIN_MASTER_UPDATE_LIMIT                         fc::minutes(60)
 #define CHAIN_ACCOUNT_ON_SALE_DELAY                       fc::days(7)
 #define CHAIN_CLEAR_USED_INVITE_DELAY                     fc::days(1)
+#define CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY        fc::days(7)
 
 #define CHAIN_BLOCK_INTERVAL                  3
 #define CHAIN_BLOCK_WITNESS_REPEAT            1
