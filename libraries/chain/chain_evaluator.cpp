@@ -1430,6 +1430,13 @@ namespace graphene { namespace chain {
             _db.update_master_authority(account, o.new_master_authority);
             _db.modify(account, [&](account_object &a) {
                 a.last_account_recovery = _db.head_block_time();
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    //reset on sale properties
+                    a.account_seller = "";
+                    a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                    a.account_on_sale=false;
+                    a.account_on_sale_start_time = fc::time_point_sec::min();
+                }
             });
         }
 
@@ -1558,6 +1565,16 @@ namespace graphene { namespace chain {
             _db.modify(account, [&](account_object& a) {
                 a.account_seller = op.account_seller;
                 a.account_offer_price = op.account_offer_price;
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    if(false==a.account_on_sale){
+                        if(true==op.account_on_sale){
+                            a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
+                        }
+                    }
+                    if(false==op.account_on_sale){
+                        a.account_on_sale_start_time = fc::time_point_sec::min();
+                    }
+                }
                 a.account_on_sale = op.account_on_sale;
             });
         }
@@ -1604,6 +1621,17 @@ namespace graphene { namespace chain {
                     FC_ASSERT(false, "Account not on sale.");
                 }
                 else{
+                    if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                        //check account recovery request
+                        const auto &recovery_request_idx = _db.get_index<account_recovery_request_index>().indices().get<by_account>();
+                        auto request = recovery_request_idx.find(op.account);
+                        if(request != recovery_request_idx.end()){
+                            FC_ASSERT(false, "Account have recovery request.");
+                        }
+                        //check account on sale delay
+                        FC_ASSERT(account.account_on_sale_start_time <= _db.head_block_time(),
+                            "Account selling will start on ${t}.",("t",account.account_on_sale_start_time));
+                    }
                     const auto& account_seller = _db.get_account(account.account_seller);
                     FC_ASSERT(account.account_offer_price == op.account_offer_price,
                         "Account offer price must be equal account_offer_price in target account: required ${a}, ${p} provided.",("a",account.account_offer_price)("p",op.account_offer_price));
@@ -1622,6 +1650,9 @@ namespace graphene { namespace chain {
                         a.account_seller = "";
                         a.account_offer_price = asset(0, TOKEN_SYMBOL);
                         a.account_on_sale=false;
+                        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                            a.account_on_sale_start_time = fc::time_point_sec::min();
+                        }
 
                         a.subaccount_seller = "";
                         a.subaccount_offer_price = asset(0, TOKEN_SYMBOL);

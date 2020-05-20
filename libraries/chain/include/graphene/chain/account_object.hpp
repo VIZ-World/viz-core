@@ -125,6 +125,7 @@ public:
     account_name_type account_seller;
     asset account_offer_price = asset(0, TOKEN_SYMBOL);
     bool account_on_sale = false;
+    time_point_sec account_on_sale_start_time = fc::time_point_sec::min();
 
     account_name_type subaccount_seller;
     asset subaccount_offer_price = asset(0, TOKEN_SYMBOL);
@@ -507,7 +508,7 @@ FC_REFLECT((graphene::chain::account_object),
                 (last_root_post)(last_post)
                 (average_bandwidth)(lifetime_bandwidth)(last_bandwidth_update)
                 (valid)
-                (account_seller)(account_offer_price)(account_on_sale)
+                (account_seller)(account_offer_price)(account_on_sale)(account_on_sale_start_time)
                 (subaccount_seller)(subaccount_offer_price)(subaccount_on_sale)
 )
 CHAINBASE_SET_INDEX_TYPE(graphene::chain::account_object, graphene::chain::account_index)
