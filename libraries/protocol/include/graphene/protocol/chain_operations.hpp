@@ -1058,6 +1058,18 @@ namespace graphene { namespace protocol {
                 a.insert(buyer);
             }
         };
+
+        struct use_invite_balance_operation : public base_operation {
+            account_name_type initiator;
+            account_name_type receiver;
+            string invite_secret;
+
+            void validate() const;
+
+            void get_required_active_authorities(flat_set<account_name_type> &a) const {
+                a.insert(initiator);
+            }
+        };
 } } // graphene::protocol
 
 
@@ -1134,3 +1146,4 @@ FC_REFLECT((graphene::protocol::paid_subscribe_operation), (subscriber)(account)
 FC_REFLECT((graphene::protocol::set_account_price_operation), (account)(account_seller)(account_offer_price)(account_on_sale));
 FC_REFLECT((graphene::protocol::set_subaccount_price_operation), (account)(subaccount_seller)(subaccount_offer_price)(subaccount_on_sale));
 FC_REFLECT((graphene::protocol::buy_account_operation), (buyer)(account)(account_offer_price)(account_authorities_key)(tokens_to_shares));
+FC_REFLECT((graphene::protocol::use_invite_balance_operation), (initiator)(receiver)(invite_secret));

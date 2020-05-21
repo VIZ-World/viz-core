@@ -2577,6 +2577,7 @@ namespace graphene { namespace chain {
             _my->_evaluator_registry.register_evaluator<set_account_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<set_subaccount_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<buy_account_evaluator>();
+            _my->_evaluator_registry.register_evaluator<use_invite_balance_evaluator>();
         }
 
         void database::set_custom_operation_interpreter(const std::string &id, std::shared_ptr<custom_operation_interpreter> registry) {

@@ -48,8 +48,8 @@ namespace graphene { namespace chain {
         auto itr = idx.find(check_invite_key);
         FC_ASSERT(itr != idx.end(), "Invite was not found.");
 
-        _db.adjust_balance(receiver, itr->balance);
         if(itr->status == 0){
+            _db.adjust_balance(receiver, itr->balance);
             _db.modify(*itr, [&](invite_object& c) {
                 c.status = 1;
                 from_string(c.invite_secret, o.invite_secret);
@@ -102,6 +102,36 @@ namespace graphene { namespace chain {
                 c.status = 2;
                 from_string(c.invite_secret, o.invite_secret);
                 c.receiver = o.new_account_name;
+                c.claimed_balance=c.balance;
+                c.balance=asset(0, TOKEN_SYMBOL);
+                c.claim_time = _db.head_block_time();
+            });
+        }
+        else{
+            FC_ASSERT(false, "Invite already claimed.");
+        }
+    }
+
+    void use_invite_balance_evaluator::do_apply(const use_invite_balance_operation& o) {
+        FC_ASSERT( _db.has_hardfork(CHAIN_HARDFORK_9), "use_invite_balance not enabled until HF 9" );
+        const auto& receiver = _db.get_account(o.receiver);
+        FC_ASSERT(o.invite_secret.size(), "Invite secret cannot be blank.");
+
+        fc::optional<fc::ecc::private_key> invite_secret = graphene::utilities::wif_to_key(o.invite_secret);
+        FC_ASSERT(invite_secret, "Invite secret must be WIF.");
+
+        public_key_type check_invite_key = invite_secret->get_public_key();
+
+        const auto &idx = _db.get_index<invite_index>().indices().get<by_invite_key>();
+        auto itr = idx.find(check_invite_key);
+        FC_ASSERT(itr != idx.end(), "Invite was not found.");
+
+        if(itr->status == 0){
+            _db.create_vesting(receiver, itr->balance);
+            _db.modify(*itr, [&](invite_object& c) {
+                c.status = 3;
+                from_string(c.invite_secret, o.invite_secret);
+                c.receiver = o.receiver;
                 c.claimed_balance=c.balance;
                 c.balance=asset(0, TOKEN_SYMBOL);
                 c.claim_time = _db.head_block_time();

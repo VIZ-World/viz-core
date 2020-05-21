@@ -48,6 +48,7 @@ namespace graphene { namespace chain {
         DEFINE_EVALUATOR(set_account_price)
         DEFINE_EVALUATOR(set_subaccount_price)
         DEFINE_EVALUATOR(buy_account)
+        DEFINE_EVALUATOR(use_invite_balance)
 
         class proposal_create_evaluator: public evaluator_impl<proposal_create_evaluator> {
         public:

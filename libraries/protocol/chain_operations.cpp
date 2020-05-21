@@ -403,4 +403,9 @@ namespace graphene { namespace protocol {
             FC_ASSERT(tokens_to_shares.amount > 0, "Token to shares cannot be negative or zero amount");
         }
 
+        void use_invite_balance_operation::validate() const {
+            validate_account_name(initiator);
+            validate_account_name(receiver);
+        }
+
 } } // graphene::protocol
