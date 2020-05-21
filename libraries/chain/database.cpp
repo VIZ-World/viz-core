@@ -2517,6 +2517,9 @@ namespace graphene { namespace chain {
                 adjust_balance(from_account, old_escrow.token_balance);
                 adjust_balance(from_account, old_escrow.pending_fee);
 
+                push_virtual_operation(
+                    expire_escrow_ratification_operation(old_escrow.from,old_escrow.to,old_escrow.agent,old_escrow.escrow_id,old_escrow.token_balance,old_escrow.pending_fee,old_escrow.ratification_deadline));
+
                 remove(old_escrow);
             }
         }

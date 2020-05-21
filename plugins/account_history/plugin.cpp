@@ -357,6 +357,12 @@ if( options.count(name) ) { \
         void operator()(const use_invite_balance_operation& op) {
             impacted.insert(op.receiver);
         }
+
+        void operator()(const escrow_ratification_deadline_operation& op) {
+            impacted.insert(op.from);
+            impacted.insert(op.to);
+            impacted.insert(op.agent);
+        }
         //void operator()( const operation& op ){}
     };
 
