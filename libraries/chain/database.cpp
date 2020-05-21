@@ -1711,7 +1711,7 @@ namespace graphene { namespace chain {
                 active.push_back(&get_witness(wso.current_shuffled_witnesses[i]));
             }
 
-            chain_properties_hf6 median_props;
+            chain_properties_hf9 median_props;
             auto median = active.size() / 2;
 
             auto calc_median = [&](auto&& param) {
@@ -4523,6 +4523,49 @@ namespace graphene { namespace chain {
                 }
                 case CHAIN_HARDFORK_9:
                 {
+                    //remove witnesses without signed block
+                    const auto &idx = get_index<witness_index>().indices().get<by_id>();
+                    auto itr = idx.begin();
+                    while(itr != idx.end()){
+                        const auto &current = *itr;
+                        ++itr;
+                        if(0==current.last_confirmed_block_num){
+                            remove(current);
+                        }
+                    }
+
+                    //remove committee requests without votes
+                    const auto &idx2 = get_index<committee_request_index>().indices().get<by_id>();
+                    auto itr2 = idx2.begin();
+                    while(itr2 != idx2.end()){
+                        const auto &current = *itr2;
+                        ++itr2;
+                        if(1==current.status){
+                            if(0==current.votes_count){
+                                remove(current);
+                            }
+                        }
+                    }
+
+                    //remove all paid subscriptions without subscribes
+                    const auto &idx3 = get_index<paid_subscription_index>().indices().get<by_id>();
+                    auto itr3 = idx3.begin();
+                    while(itr3 != idx3.end()) {
+                        const auto &current = *itr3;
+                        ++itr3;
+
+                        bool find_subscribe=false;
+
+                        const auto &idx4 = get_index<paid_subscribe_index>().indices().get<by_creator>();
+                        auto itr4 = idx4.find(current.creator);
+                        if(itr4 != idx4.end()){
+                            find_subscribe=true;
+                        }
+
+                        if(!find_subscribe){
+                            remove(current);
+                        }
+                    }
                     break;
                 }
                 default:
