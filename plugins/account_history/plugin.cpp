@@ -358,7 +358,7 @@ if( options.count(name) ) { \
             impacted.insert(op.receiver);
         }
 
-        void operator()(const escrow_ratification_deadline_operation& op) {
+        void operator()(const expire_escrow_ratification_operation& op) {
             impacted.insert(op.from);
             impacted.insert(op.to);
             impacted.insert(op.agent);

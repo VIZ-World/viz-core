@@ -1551,7 +1551,7 @@ namespace graphene { namespace chain {
 
         void set_account_price_evaluator::do_apply(const set_account_price_operation& op) {
             const auto& account = _db.get_account(op.account);
-            const auto& account_seller = _db.get_account(op.account_seller);
+            _db.get_account(op.account_seller);
             if(_db.has_hardfork(CHAIN_HARDFORK_9)){
                 if(""==account.account_seller){
                     const auto& median_props = _db.get_witness_schedule_object().median_props;
@@ -1585,7 +1585,7 @@ namespace graphene { namespace chain {
 
         void set_subaccount_price_evaluator::do_apply(const set_subaccount_price_operation& op) {
             const auto& account = _db.get_account(op.account);
-            const auto& subaccount_seller = _db.get_account(op.subaccount_seller);
+            _db.get_account(op.subaccount_seller);
             if(_db.has_hardfork(CHAIN_HARDFORK_9)){
                 if(""==account.subaccount_seller){
                     const auto& median_props = _db.get_witness_schedule_object().median_props;

@@ -3611,23 +3611,21 @@ namespace graphene { namespace chain {
         }
 
         void database::clear_used_invites() {
-            auto remove_time = head_block_time() - CHAIN_CLEAR_USED_INVITE_DELAY;
+            fc::time_point_sec remove_time = head_block_time() - CHAIN_CLEAR_USED_INVITE_DELAY;
             const auto& invites_idx = get_index<invite_index, by_status>();
-            auto itr = invites_idx.begin();
             auto itr = invites_idx.lower_bound(1);
             while (itr != invites_idx.end() && itr->status != 0){
                 const auto &cur_invite = *itr;
                 ++itr;
                 if(remove_time > cur_invite.claim_time){
-                    _db.remove(cur_invite);
+                    remove(cur_invite);
                 }
             }
         }
 
         void database::clear_closed_committee_requests() {
-            auto remove_time = head_block_time() - CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY;
+            fc::time_point_sec remove_time = head_block_time() - CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY;
             const auto& requests_idx = get_index<committee_request_index, by_status>();
-            auto itr = requests_idx.begin();
             auto itr = requests_idx.lower_bound(1);
             while (itr != requests_idx.end() && itr->status != 0){
                 const auto &cur_request = *itr;
@@ -3643,7 +3641,7 @@ namespace graphene { namespace chain {
                                 ++votes_itr;
                                 remove(cur_vote);
                             }
-                            _db.remove(cur_request);
+                            remove(cur_request);
                         }
                     }
                 }
