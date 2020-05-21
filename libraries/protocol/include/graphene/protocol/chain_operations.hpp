@@ -543,6 +543,12 @@ namespace graphene { namespace protocol {
              */
             asset witness_declaration_fee = asset(CONSENSUS_WITNESS_DECLARATION_FEE, TOKEN_SYMBOL);
 
+            /**
+             *  Consensus - withdraw intervals (duration defined as CHAIN_VESTING_WITHDRAW_INTERVAL_SECONDS equal 1 day)
+             */
+            uint16_t withdraw_intervals = CHAIN_VESTING_WITHDRAW_INTERVALS;
+
+
             void validate() const {
                 chain_properties_hf6::validate();
                 FC_ASSERT(create_invite_min_balance.amount > 0);
@@ -557,6 +563,7 @@ namespace graphene { namespace protocol {
                 FC_ASSERT(subaccount_on_sale_fee.symbol == TOKEN_SYMBOL);
                 FC_ASSERT(witness_declaration_fee.amount > 0);
                 FC_ASSERT(witness_declaration_fee.symbol == TOKEN_SYMBOL);
+                FC_ASSERT(withdraw_intervals > 0);
             }
 
             chain_properties_hf9& operator=(const chain_properties_init& src) {
@@ -1090,7 +1097,7 @@ FC_REFLECT_DERIVED(
     (data_operations_cost_additional_bandwidth)(witness_miss_penalty_percent)(witness_miss_penalty_duration))
 FC_REFLECT_DERIVED(
     (graphene::protocol::chain_properties_hf9),((graphene::protocol::chain_properties_hf6)),
-    (create_invite_min_balance)(committee_create_request_fee)(create_paid_subscription_fee)(account_on_sale_fee)(subaccount_on_sale_fee)(witness_declaration_fee))
+    (create_invite_min_balance)(committee_create_request_fee)(create_paid_subscription_fee)(account_on_sale_fee)(subaccount_on_sale_fee)(witness_declaration_fee)(withdraw_intervals))
 
 FC_REFLECT_TYPENAME((graphene::protocol::versioned_chain_properties))
 

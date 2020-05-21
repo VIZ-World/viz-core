@@ -779,6 +779,7 @@ namespace graphene { namespace chain {
 
         void withdraw_vesting_evaluator::do_apply(const withdraw_vesting_operation &o) {
             database &_db = db();
+            const auto& median_props = _db.get_witness_schedule_object().median_props;
 
             const auto &account = _db.get_account(o.account);
 
@@ -801,6 +802,9 @@ namespace graphene { namespace chain {
             }
             else {
                 int vesting_withdraw_intervals = CHAIN_VESTING_WITHDRAW_INTERVALS;
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    vesting_withdraw_intervals=median_props.withdraw_intervals;
+                }
 
                 _db.modify(account, [&](account_object &a) {
                     auto new_vesting_withdraw_rate = asset(

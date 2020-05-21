@@ -1755,6 +1755,7 @@ namespace graphene { namespace chain {
                 calc_median(&chain_properties_hf9::account_on_sale_fee);
                 calc_median(&chain_properties_hf9::subaccount_on_sale_fee);
                 calc_median(&chain_properties_hf9::witness_declaration_fee);
+                calc_median(&chain_properties_hf9::withdraw_intervals);
             }
 
             modify(wso, [&](witness_schedule_object &_wso) {
