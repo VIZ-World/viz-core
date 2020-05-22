@@ -28,35 +28,6 @@ RUN \
         python3-pip && \
     pip3 install gcovr
 
-# installing mongo drivers
-RUN \
-    echo "Installing mongo-c-driver" && \
-    apt-get -qq update && \
-    apt-get install -y \
-        pkg-config \
-        libssl-dev \
-        libsasl2-dev \
-        wget \
-    && \
-    wget https://github.com/mongodb/mongo-c-driver/releases/download/1.9.5/mongo-c-driver-1.9.5.tar.gz && \
-    tar xzf mongo-c-driver-1.9.5.tar.gz && \
-    cd mongo-c-driver-1.9.5 && \
-    ./configure --disable-automatic-init-and-cleanup --enable-static && \
-    make && \
-    make install && \
-    cd .. && \
-    rm -rf mongo-c-driver-1.9.5 && \
-    echo "Installing mongo-cxx-driver" && \
-    git clone https://github.com/mongodb/mongo-cxx-driver.git --branch releases/v3.2 --depth 1 && \
-    cd mongo-cxx-driver/build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. && \
-    make EP_mnmlstc_core && \
-    make && \
-    make install && \
-    cd ../.. && \
-    rm -rf mongo-cxx-driver
-# end
-
 # Explicitly copy needed files to avoid re-building when changing other files
 COPY .git $APPDIR/.git
 COPY .gitignore .gitmodules CMakeLists.txt Doxyfile $APPDIR/
@@ -74,9 +45,10 @@ RUN \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBRARIES=FALSE \
+        -DBUILD_TESTNET=TRUE \
         -DLOW_MEMORY_NODE=FALSE \
         -DCHAINBASE_CHECK_LOCKING=FALSE \
-        -DENABLE_MONGO_PLUGIN=TRUE \
+        -DENABLE_MONGO_PLUGIN=FALSE \
         .. \
     && \
     make -j$(nproc)
@@ -95,9 +67,8 @@ RUN set -xe ;\
     chown vizd:vizd -R /var/cache/vizd
 
 COPY share/vizd/vizd.sh /etc/service/vizd/run
-COPY share/vizd/snapshot.json /var/lib/vizd
-COPY share/vizd/seednodes /etc/vizd/seednodes
-COPY share/vizd/config/config_mongo.ini /etc/vizd/config.ini
+COPY share/vizd/snapshot-testnet.json /var/lib/vizd/snapshot.json
+COPY share/vizd/config/config_testnet.ini /etc/vizd/config.ini
 
 # rpc services:
 # http
