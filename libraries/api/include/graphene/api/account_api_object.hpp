@@ -81,6 +81,7 @@ struct account_api_object {
     account_name_type account_seller;
     asset account_offer_price;
     bool account_on_sale;
+    time_point_sec account_on_sale_start_time;
 
     account_name_type subaccount_seller;
     asset subaccount_offer_price;
@@ -103,7 +104,7 @@ FC_REFLECT(
     (average_bandwidth)(lifetime_bandwidth)(last_bandwidth_update)
     (witness_votes)
     (valid)
-    (account_seller)(account_offer_price)(account_on_sale)
+    (account_seller)(account_offer_price)(account_on_sale)(account_on_sale_start_time)
     (subaccount_seller)(subaccount_offer_price)(subaccount_on_sale)
 )
 
