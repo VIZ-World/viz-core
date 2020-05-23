@@ -20,11 +20,25 @@ Initial users and their keys are defined inside *libraries/protocol/include/grap
 
 ## Launch
 
-To run a testnet node, please use Dockerfile-testnet.
+To run a testnet node, please use [Docker](https://docs.docker.com/engine/install/).
+
+To build image locally, use Dockerfile-testnet:
+
+```
+docker build -t viz:testnet -f share/vizd/docker/Dockerfile-testnet .
+docker run -d --name vizd viz:testnet
+docker logs --tail 100 -f vizd
+```
+
+To use pre-built image, run node with
+
+```
+docker run -d --name vizd vizblockchain/vizd:testnet
+```
 
 ## Additional users
 
-To easy testing, several additional users immediately availabe:
+To ease testing, several additional users are immediately available:
 
 * alice
 * bob
