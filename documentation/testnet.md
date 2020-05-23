@@ -38,7 +38,7 @@ docker run -d --name vizd vizblockchain/vizd:testnet
 
 ## Additional users
 
-To easy testing, several additional users immediately available:
+To ease testing, several additional users are immediately available:
 
 * alice
 * bob
