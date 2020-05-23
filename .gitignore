@@ -49,3 +49,4 @@ documentation/doxygen/latex
 *.pyc
 *.pyo
 *.egg-info/
+build

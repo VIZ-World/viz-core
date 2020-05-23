@@ -779,6 +779,7 @@ namespace graphene { namespace chain {
 
         void withdraw_vesting_evaluator::do_apply(const withdraw_vesting_operation &o) {
             database &_db = db();
+            const auto& median_props = _db.get_witness_schedule_object().median_props;
 
             const auto &account = _db.get_account(o.account);
 
@@ -801,6 +802,9 @@ namespace graphene { namespace chain {
             }
             else {
                 int vesting_withdraw_intervals = CHAIN_VESTING_WITHDRAW_INTERVALS;
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    vesting_withdraw_intervals=median_props.withdraw_intervals;
+                }
 
                 _db.modify(account, [&](account_object &a) {
                     auto new_vesting_withdraw_rate = asset(
@@ -1430,6 +1434,13 @@ namespace graphene { namespace chain {
             _db.update_master_authority(account, o.new_master_authority);
             _db.modify(account, [&](account_object &a) {
                 a.last_account_recovery = _db.head_block_time();
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    //reset on sale properties
+                    a.account_seller = "";
+                    a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                    a.account_on_sale=false;
+                    a.account_on_sale_start_time = fc::time_point_sec::min();
+                }
             });
         }
 
@@ -1540,17 +1551,55 @@ namespace graphene { namespace chain {
 
         void set_account_price_evaluator::do_apply(const set_account_price_operation& op) {
             const auto& account = _db.get_account(op.account);
-            const auto& account_seller = _db.get_account(op.account_seller);
+            _db.get_account(op.account_seller);
+            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                if(""==account.account_seller){
+                    const auto& median_props = _db.get_witness_schedule_object().median_props;
+                    const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                    FC_ASSERT(account.balance >=
+                              median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
+
+                    _db.adjust_balance(account, -median_props.account_on_sale_fee);
+                    _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                        dgp.committee_fund += median_props.account_on_sale_fee;
+                    });
+                }
+            }
             _db.modify(account, [&](account_object& a) {
                 a.account_seller = op.account_seller;
                 a.account_offer_price = op.account_offer_price;
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    if(false==a.account_on_sale){
+                        if(true==op.account_on_sale){
+                            a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
+                        }
+                    }
+                    if(false==op.account_on_sale){
+                        a.account_on_sale_start_time = fc::time_point_sec::min();
+                    }
+                }
                 a.account_on_sale = op.account_on_sale;
             });
         }
 
         void set_subaccount_price_evaluator::do_apply(const set_subaccount_price_operation& op) {
             const auto& account = _db.get_account(op.account);
-            const auto& subaccount_seller = _db.get_account(op.subaccount_seller);
+            _db.get_account(op.subaccount_seller);
+            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                if(""==account.subaccount_seller){
+                    const auto& median_props = _db.get_witness_schedule_object().median_props;
+                    const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                    FC_ASSERT(account.balance >=
+                              median_props.subaccount_on_sale_fee, "Account does not have sufficient funds to place subaccount for sale: required ${a}.",("a",median_props.subaccount_on_sale_fee));
+
+                    _db.adjust_balance(account, -median_props.subaccount_on_sale_fee);
+                    _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                        dgp.committee_fund += median_props.subaccount_on_sale_fee;
+                    });
+                }
+            }
             _db.modify(account, [&](account_object& a) {
                 a.subaccount_seller = op.subaccount_seller;
                 a.subaccount_offer_price = op.subaccount_offer_price;
@@ -1576,6 +1625,17 @@ namespace graphene { namespace chain {
                     FC_ASSERT(false, "Account not on sale.");
                 }
                 else{
+                    if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                        //check account recovery request
+                        const auto &recovery_request_idx = _db.get_index<account_recovery_request_index>().indices().get<by_account>();
+                        auto request = recovery_request_idx.find(op.account);
+                        if(request != recovery_request_idx.end()){
+                            FC_ASSERT(false, "Account have recovery request.");
+                        }
+                        //check account on sale delay
+                        FC_ASSERT(account.account_on_sale_start_time <= _db.head_block_time(),
+                            "Account selling will start on ${t}.",("t",account.account_on_sale_start_time));
+                    }
                     const auto& account_seller = _db.get_account(account.account_seller);
                     FC_ASSERT(account.account_offer_price == op.account_offer_price,
                         "Account offer price must be equal account_offer_price in target account: required ${a}, ${p} provided.",("a",account.account_offer_price)("p",op.account_offer_price));
@@ -1594,6 +1654,9 @@ namespace graphene { namespace chain {
                         a.account_seller = "";
                         a.account_offer_price = asset(0, TOKEN_SYMBOL);
                         a.account_on_sale=false;
+                        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                            a.account_on_sale_start_time = fc::time_point_sec::min();
+                        }
 
                         a.subaccount_seller = "";
                         a.subaccount_offer_price = asset(0, TOKEN_SYMBOL);

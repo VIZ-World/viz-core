@@ -485,6 +485,8 @@ namespace graphene { namespace chain {
 
             void clear_expired_transactions();
             void clear_expired_delegations();
+            void clear_used_invites();
+            void clear_closed_committee_requests();
 
             void process_header_extensions(const signed_block &next_block);
 

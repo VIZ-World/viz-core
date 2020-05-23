@@ -20,7 +20,7 @@ account_api_object::account_api_object(const account_object& a, const graphene::
         withdrawn(a.withdrawn), to_withdraw(a.to_withdraw), withdraw_routes(a.withdraw_routes),
         witnesses_voted_for(a.witnesses_voted_for), witnesses_vote_weight(a.witnesses_vote_weight), last_root_post(a.last_root_post), last_post(a.last_post),
         average_bandwidth(a.average_bandwidth), lifetime_bandwidth(a.lifetime_bandwidth), last_bandwidth_update(a.last_bandwidth_update),
-        valid(a.valid), account_seller(a.account_seller), account_offer_price(a.account_offer_price), account_on_sale(a.account_on_sale),
+        valid(a.valid), account_seller(a.account_seller), account_offer_price(a.account_offer_price), account_on_sale(a.account_on_sale), account_on_sale_start_time(a.account_on_sale_start_time),
         subaccount_seller(a.subaccount_seller), subaccount_offer_price(a.subaccount_offer_price), subaccount_on_sale(a.subaccount_on_sale){
     size_t n = a.proxied_vsf_votes.size();
     proxied_vsf_votes.reserve(n);

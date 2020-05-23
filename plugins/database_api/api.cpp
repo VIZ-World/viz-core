@@ -427,7 +427,9 @@ DEFINE_API(plugin, get_accounts_on_sale) {
             from--;
         }
         while (result.size() < limit && itr != idx.end() && itr->account_on_sale == true) {
-            result.push_back(account_object(*itr));
+            if(itr->account_on_sale_start_time <= my->database().head_block_time()){
+                result.push_back(account_object(*itr));
+            }
             ++itr;
         }
         return result;

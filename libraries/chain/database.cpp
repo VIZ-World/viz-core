@@ -1711,7 +1711,7 @@ namespace graphene { namespace chain {
                 active.push_back(&get_witness(wso.current_shuffled_witnesses[i]));
             }
 
-            chain_properties_hf6 median_props;
+            chain_properties_hf9 median_props;
             auto median = active.size() / 2;
 
             auto calc_median = [&](auto&& param) {
@@ -1747,6 +1747,15 @@ namespace graphene { namespace chain {
                 calc_median(&chain_properties_hf6::data_operations_cost_additional_bandwidth);
                 calc_median(&chain_properties_hf6::witness_miss_penalty_percent);
                 calc_median(&chain_properties_hf6::witness_miss_penalty_duration);
+            }
+            if(has_hardfork(CHAIN_HARDFORK_9)){
+                calc_median(&chain_properties_hf9::create_invite_min_balance);
+                calc_median(&chain_properties_hf9::committee_create_request_fee);
+                calc_median(&chain_properties_hf9::create_paid_subscription_fee);
+                calc_median(&chain_properties_hf9::account_on_sale_fee);
+                calc_median(&chain_properties_hf9::subaccount_on_sale_fee);
+                calc_median(&chain_properties_hf9::witness_declaration_fee);
+                calc_median(&chain_properties_hf9::withdraw_intervals);
             }
 
             modify(wso, [&](witness_schedule_object &_wso) {
@@ -2509,6 +2518,9 @@ namespace graphene { namespace chain {
                 adjust_balance(from_account, old_escrow.token_balance);
                 adjust_balance(from_account, old_escrow.pending_fee);
 
+                push_virtual_operation(
+                    expire_escrow_ratification_operation(old_escrow.from,old_escrow.to,old_escrow.agent,old_escrow.escrow_id,old_escrow.token_balance,old_escrow.pending_fee,old_escrow.ratification_deadline));
+
                 remove(old_escrow);
             }
         }
@@ -2569,6 +2581,7 @@ namespace graphene { namespace chain {
             _my->_evaluator_registry.register_evaluator<set_account_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<set_subaccount_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<buy_account_evaluator>();
+            _my->_evaluator_registry.register_evaluator<use_invite_balance_evaluator>();
         }
 
         void database::set_custom_operation_interpreter(const std::string &id, std::shared_ptr<custom_operation_interpreter> registry) {
@@ -3192,6 +3205,10 @@ namespace graphene { namespace chain {
                 clear_expired_proposals();
                 clear_expired_transactions();
                 clear_expired_delegations();
+                if(has_hardfork(CHAIN_HARDFORK_9)){
+                    clear_used_invites();
+                    clear_closed_committee_requests();
+                }
                 update_bandwidth_reserve_candidates();
                 update_witness_schedule();
 
@@ -3593,6 +3610,44 @@ namespace graphene { namespace chain {
             }
         }
 
+        void database::clear_used_invites() {
+            fc::time_point_sec remove_time = head_block_time() - CHAIN_CLEAR_USED_INVITE_DELAY;
+            const auto& invites_idx = get_index<invite_index, by_status>();
+            auto itr = invites_idx.lower_bound(1);
+            while (itr != invites_idx.end() && itr->status != 0){
+                const auto &cur_invite = *itr;
+                ++itr;
+                if(remove_time > cur_invite.claim_time){
+                    remove(cur_invite);
+                }
+            }
+        }
+
+        void database::clear_closed_committee_requests() {
+            fc::time_point_sec remove_time = head_block_time() - CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY;
+            const auto& requests_idx = get_index<committee_request_index, by_status>();
+            auto itr = requests_idx.lower_bound(1);
+            while (itr != requests_idx.end() && itr->status != 0){
+                const auto &cur_request = *itr;
+                ++itr;
+                if(4 != cur_request.status){
+                    if(5 != cur_request.status){
+                        if(remove_time > cur_request.conclusion_time){
+                            const auto& votes_idx = get_index<committee_vote_index>().indices().get<by_request_id>();
+                            auto votes_itr = votes_idx.lower_bound(cur_request.request_id);
+                            while(votes_itr != votes_idx.end() &&
+                                   votes_itr->request_id == cur_request.request_id) {
+                                const auto &cur_vote = *votes_itr;
+                                ++votes_itr;
+                                remove(cur_vote);
+                            }
+                            remove(cur_request);
+                        }
+                    }
+                }
+            }
+        }
+
         void database::adjust_balance(const account_object &a, const asset &delta) {
             modify(a, [&](account_object &acnt) {
                 switch (delta.symbol) {
@@ -3660,6 +3715,9 @@ namespace graphene { namespace chain {
 
             _hardfork_times[CHAIN_HARDFORK_8] = fc::time_point_sec(CHAIN_HARDFORK_8_TIME);
             _hardfork_versions[CHAIN_HARDFORK_8] = CHAIN_HARDFORK_8_VERSION;
+
+            _hardfork_times[CHAIN_HARDFORK_9] = fc::time_point_sec(CHAIN_HARDFORK_9_TIME);
+            _hardfork_versions[CHAIN_HARDFORK_9] = CHAIN_HARDFORK_9_VERSION;
 
             const auto &hardforks = get_hardfork_property_object();
             FC_ASSERT(
@@ -4458,6 +4516,53 @@ namespace graphene { namespace chain {
                         modify(get_account(itr->delegator), [&](account_object& a) {
                             a.delegated_vesting_shares += itr->vesting_shares;
                         });
+                    }
+                    break;
+                }
+                case CHAIN_HARDFORK_9:
+                {
+                    //remove witnesses without signed block
+                    const auto &idx = get_index<witness_index>().indices().get<by_id>();
+                    auto itr = idx.begin();
+                    while(itr != idx.end()){
+                        const auto &current = *itr;
+                        ++itr;
+                        if(0==current.last_confirmed_block_num){
+                            remove(current);
+                        }
+                    }
+
+                    //remove committee requests without votes
+                    const auto &idx2 = get_index<committee_request_index>().indices().get<by_id>();
+                    auto itr2 = idx2.begin();
+                    while(itr2 != idx2.end()){
+                        const auto &current = *itr2;
+                        ++itr2;
+                        if(1==current.status){
+                            if(0==current.votes_count){
+                                remove(current);
+                            }
+                        }
+                    }
+
+                    //remove all paid subscriptions without subscribes
+                    const auto &idx3 = get_index<paid_subscription_index>().indices().get<by_id>();
+                    auto itr3 = idx3.begin();
+                    while(itr3 != idx3.end()) {
+                        const auto &current = *itr3;
+                        ++itr3;
+
+                        bool find_subscribe=false;
+
+                        const auto &idx4 = get_index<paid_subscribe_index>().indices().get<by_creator>();
+                        auto itr4 = idx4.find(current.creator);
+                        if(itr4 != idx4.end()){
+                            find_subscribe=true;
+                        }
+
+                        if(!find_subscribe){
+                            remove(current);
+                        }
                     }
                     break;
                 }
