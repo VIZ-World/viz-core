@@ -33,6 +33,14 @@ namespace graphene { namespace api {
         fc::optional<uint32_t> data_operations_cost_additional_bandwidth;
         fc::optional<int16_t> witness_miss_penalty_percent;
         fc::optional<uint32_t> witness_miss_penalty_duration;
+
+        fc::optional<asset> create_invite_min_balance;
+        fc::optional<asset> committee_create_request_fee;
+        fc::optional<asset> create_paid_subscription_fee;
+        fc::optional<asset> account_on_sale_fee;
+        fc::optional<asset> subaccount_on_sale_fee;
+        fc::optional<asset> witness_declaration_fee;
+        fc::optional<uint16_t> withdraw_intervals;
     };
 
 } } // graphene::api
@@ -44,4 +52,6 @@ FC_REFLECT(
     (min_curation_percent)(max_curation_percent)(bandwidth_reserve_percent)(bandwidth_reserve_below)
     (flag_energy_additional_cost)(vote_accounting_min_rshares)(committee_request_approve_min_percent)
     (inflation_witness_percent)(inflation_ratio_committee_vs_reward_fund)(inflation_recalc_period)
-    (data_operations_cost_additional_bandwidth)(witness_miss_penalty_percent)(witness_miss_penalty_duration))
+    (data_operations_cost_additional_bandwidth)(witness_miss_penalty_percent)(witness_miss_penalty_duration)
+    (create_invite_min_balance)(committee_create_request_fee)(create_paid_subscription_fee)
+    (account_on_sale_fee)(subaccount_on_sale_fee)(witness_declaration_fee)(withdraw_intervals))
