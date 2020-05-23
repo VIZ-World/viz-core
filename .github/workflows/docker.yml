@@ -1,9 +1,13 @@
 name: Build testnet docker image for a PR
 
-on: [pull_request]
+on:
+  pull_request:
+    paths-ignore:
+      - 'documentation/**'
+      - '**.md'
 
 jobs:
-  build_image:
+  build_testnet:
     name: Build and push Docker image to Docker Hub
     runs-on: ubuntu-latest
 
