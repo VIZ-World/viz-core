@@ -1,0 +1,40 @@
+name: Build docker images
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'documentation/**'
+      - '**.md'
+
+jobs:
+  build_testnet:
+    name: Build testnet image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: docker/build-push-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: vizblockchain/vizd
+          dockerfile: ./share/vizd/docker/Dockerfile-testnet
+          tags: testnet
+
+  build_prod:
+    name: Build production image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: docker/build-push-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: vizblockchain/vizd
+          dockerfile: ./share/vizd/docker/Dockerfile-production
+          tags: latest
