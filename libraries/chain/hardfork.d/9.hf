@@ -1,0 +1,6 @@
+// 9 Hardfork on VIZ mainnet
+#ifndef CHAIN_HARDFORK_9
+#define CHAIN_HARDFORK_9 9
+#define CHAIN_HARDFORK_9_TIME 1589173200 // 11 May 2020 05:00:00 GMT
+#define CHAIN_HARDFORK_9_VERSION hardfork_version( version(2, 5, 0) )
+#endif

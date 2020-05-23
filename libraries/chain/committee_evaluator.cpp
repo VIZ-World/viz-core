@@ -6,9 +6,14 @@
 namespace graphene { namespace chain {
 
      void committee_worker_create_request_evaluator::do_apply(const committee_worker_create_request_operation& o) {
-        _db.get_account(o.creator);
+        const auto& median_props = _db.get_witness_schedule_object().median_props;
+        const auto &creator = _db.get_account(o.creator);
         _db.get_account(o.worker);
 
+        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+            FC_ASSERT(creator.balance >=
+                      median_props.committee_create_request_fee, "Account does not have sufficient funds to create a committee request: required ${a}.",("a",median_props.committee_create_request_fee));
+        }
         bool find=false;
 
         const auto &idx = _db.get_index<committee_request_index>().indices().get<by_creator_url>();
@@ -49,6 +54,12 @@ namespace graphene { namespace chain {
             _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
                 dgp.committee_requests = committee_request_id;
             });
+            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                _db.adjust_balance(creator, -median_props.committee_create_request_fee);
+                _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                    dgp.committee_fund += median_props.committee_create_request_fee;
+                });
+            }
         }
     }
 

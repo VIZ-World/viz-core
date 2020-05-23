@@ -87,7 +87,10 @@ namespace graphene { namespace protocol {
                 set_subaccount_price_operation,
                 buy_account_operation,
                 // virtual operations:
-                account_sale_operation
+                account_sale_operation,
+
+                use_invite_balance_operation,
+                expire_escrow_ratification_operation
         > operation;
 
         /*void operation_get_required_authorities( const operation& op,

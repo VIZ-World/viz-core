@@ -2,7 +2,7 @@
 
 #define CHAIN_STARTUP_VERSION                 (version(1, 0, 0))
 #define CHAIN_HARDFORK_STARTUP_VERSION        (hardfork_version(CHAIN_STARTUP_VERSION))
-#define CHAIN_VERSION                         (version(2, 4, 0))
+#define CHAIN_VERSION                         (version(2, 5, 0))
 #define CHAIN_HARDFORK_VERSION                (hardfork_version(CHAIN_VERSION))
 
 #define CHAIN_NAME                            "VIZ"
@@ -22,6 +22,9 @@
 #define CHAIN_MASTER_AUTH_RECOVERY_PERIOD                 fc::days(30)
 #define CHAIN_ACCOUNT_RECOVERY_REQUEST_EXPIRATION_PERIOD  fc::days(1)
 #define CHAIN_MASTER_UPDATE_LIMIT                         fc::minutes(60)
+#define CHAIN_ACCOUNT_ON_SALE_DELAY                       fc::days(7)
+#define CHAIN_CLEAR_USED_INVITE_DELAY                     fc::days(1)
+#define CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY        fc::days(7)
 
 #define CHAIN_BLOCK_INTERVAL                  3
 #define CHAIN_BLOCK_WITNESS_REPEAT            1
@@ -119,6 +122,13 @@
 #define CONSENSUS_DATA_OPERATIONS_COST_ADDITIONAL_BANDWIDTH 0
 #define CONSENSUS_WITNESS_MISS_PENALTY_PERCENT 100 // default: 1.00%
 #define CONSENSUS_WITNESS_MISS_PENALTY_DURATION (CHAIN_BLOCKS_PER_DAY*CHAIN_BLOCK_INTERVAL) // default: 1 day
+
+#define CONSENSUS_CREATE_INVITE_MIN_BALANCE   10000
+#define CONSENSUS_COMMITTEE_CREATE_REQUEST_FEE 100000
+#define CONSENSUS_WITNESS_DECLARATION_FEE     10000
+#define CONSENSUS_CREATE_PAID_SUBSCRIPTION_FEE 100000
+#define CONSENSUS_ACCOUNT_ON_SALE_FEE         10000
+#define CONSENSUS_SUBACCOUNT_ON_SALE_FEE      100000
 
 #define PAID_SUBSCRIPTION_MAX_LEVEL           1000
 #define PAID_SUBSCRIPTION_MAX_PERIOD          1000 // days

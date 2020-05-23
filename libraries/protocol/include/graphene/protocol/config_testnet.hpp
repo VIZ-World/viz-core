@@ -2,7 +2,7 @@
 
 #define CHAIN_STARTUP_VERSION                 (version(1, 0, 0))
 #define CHAIN_HARDFORK_STARTUP_VERSION        (hardfork_version(CHAIN_STARTUP_VERSION))
-#define CHAIN_VERSION                         (version(2, 4, 0))
+#define CHAIN_VERSION                         (version(2, 5, 0))
 #define CHAIN_HARDFORK_VERSION                (hardfork_version(CHAIN_VERSION))
 
 #define CHAIN_NAME                            "VIZTEST"
@@ -22,6 +22,9 @@
 #define CHAIN_MASTER_AUTH_RECOVERY_PERIOD                 fc::minutes(2)
 #define CHAIN_ACCOUNT_RECOVERY_REQUEST_EXPIRATION_PERIOD  fc::days(1)
 #define CHAIN_MASTER_UPDATE_LIMIT                         fc::seconds(60)
+#define CHAIN_ACCOUNT_ON_SALE_DELAY                       fc::days(7)
+#define CHAIN_CLEAR_USED_INVITE_DELAY                     fc::days(1)
+#define CHAIN_CLEAR_CLOSED_COMMITTEE_REQUEST_DELAY        fc::days(7)
 
 #define CHAIN_BLOCK_INTERVAL                  1
 #define CHAIN_BLOCK_WITNESS_REPEAT            1
@@ -67,7 +70,7 @@
 
 #define CHAIN_REWARD_FUND_CURATOR_PERCENT     (5*100/30*CHAIN_1_PERCENT) //5% of inflation from reward fund
 
-#define CHAIN_BANDWIDTH_AVERAGE_WINDOW_SECONDS (60*60*24) ///< 1 week
+#define CHAIN_BANDWIDTH_AVERAGE_WINDOW_SECONDS (60*60*24) ///< 1 day
 #define CHAIN_BANDWIDTH_PRECISION             1000000ll ///< 1 million
 #define CONSENSUS_BANDWIDTH_RESERVE_PERCENT   (CHAIN_100_PERCENT/10) // 10%
 #define CONSENSUS_BANDWIDTH_RESERVE_BELOW     int64_t(500000000) // 500 SHARES AMOUNT
@@ -119,6 +122,13 @@
 #define CONSENSUS_DATA_OPERATIONS_COST_ADDITIONAL_BANDWIDTH 0
 #define CONSENSUS_WITNESS_MISS_PENALTY_PERCENT 100 // default: 1.00%
 #define CONSENSUS_WITNESS_MISS_PENALTY_DURATION (CHAIN_BLOCKS_PER_DAY*CHAIN_BLOCK_INTERVAL) // default: 1 day
+
+#define CONSENSUS_CREATE_INVITE_MIN_BALANCE   10000
+#define CONSENSUS_COMMITTEE_CREATE_REQUEST_FEE 100000
+#define CONSENSUS_WITNESS_DECLARATION_FEE     10000
+#define CONSENSUS_CREATE_PAID_SUBSCRIPTION_FEE 100000
+#define CONSENSUS_ACCOUNT_ON_SALE_FEE         10000
+#define CONSENSUS_SUBACCOUNT_ON_SALE_FEE      100000
 
 #define PAID_SUBSCRIPTION_MAX_LEVEL           1000
 #define PAID_SUBSCRIPTION_MAX_PERIOD          1000 // days

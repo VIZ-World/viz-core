@@ -259,6 +259,25 @@ namespace graphene { namespace protocol {
             account_name_type buyer;
             account_name_type seller;
         };
+
+        struct expire_escrow_ratification_operation : public virtual_operation {
+            expire_escrow_ratification_operation() {
+            }
+
+            expire_escrow_ratification_operation(const account_name_type& f, const account_name_type& t, const account_name_type& a, const uint32_t& id, const asset& ta, const asset& fee, const time_point_sec& rd )
+                    : from(f), to(t), agent(a), escrow_id(id), token_amount(ta), fee(fee), ratification_deadline(rd) {
+            }
+
+            account_name_type from;
+            account_name_type to;
+            account_name_type agent;
+            uint32_t escrow_id;
+
+            asset token_amount;
+            asset fee;
+
+            time_point_sec ratification_deadline;
+        };
 } } //graphene::protocol
 
 FC_REFLECT((graphene::protocol::author_reward_operation), (author)(permlink)(token_payout)(vesting_payout))
@@ -280,3 +299,4 @@ FC_REFLECT((graphene::protocol::benefactor_award_operation), (initiator)(benefac
 FC_REFLECT((graphene::protocol::paid_subscription_action_operation), (subscriber)(account)(level)(amount)(period)(summary_amount))
 FC_REFLECT((graphene::protocol::cancel_paid_subscription_operation), (subscriber)(account))
 FC_REFLECT((graphene::protocol::account_sale_operation), (account)(price)(buyer)(seller))
+FC_REFLECT((graphene::protocol::expire_escrow_ratification_operation), (from)(to)(agent)(escrow_id)(token_amount)(fee)(ratification_deadline))

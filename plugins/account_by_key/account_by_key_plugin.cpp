@@ -41,6 +41,10 @@ namespace graphene { namespace plugins { namespace account_by_key {
                             _plugin.my->cache_auths(*acct_itr);
                         }
                     }
+
+                    void operator()(const invite_registration_operation& op) const {
+                        _plugin.my->clear_cache();
+                    }
                 };
 
                 struct post_operation_visitor {
@@ -75,6 +79,13 @@ namespace graphene { namespace plugins { namespace account_by_key {
                                 op.account_to_recover);
                         if (acct_itr) {
                             _plugin.my->update_key_lookup(*acct_itr);
+                        }
+                    }
+
+                    void operator()(const invite_registration_operation& op) const {
+                        auto itr = _plugin.my->database().find<account_authority_object, by_account>(op.new_account_name);
+                        if (itr) {
+                            _plugin.my->update_key_lookup(*itr);
                         }
                     }
 

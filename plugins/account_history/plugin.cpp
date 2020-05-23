@@ -324,10 +324,12 @@ if( options.count(name) ) { \
 
         void operator()(const set_account_price_operation& op) {
             impacted.insert(op.account);
+            impacted.insert(op.account_seller);
         }
 
         void operator()(const set_subaccount_price_operation& op) {
             impacted.insert(op.account);
+            impacted.insert(op.subaccount_seller);
         }
 
         void operator()(const buy_account_operation& op) {
@@ -338,6 +340,28 @@ if( options.count(name) ) { \
             impacted.insert(op.buyer);
             impacted.insert(op.seller);
             impacted.insert(op.account);
+        }
+
+        void operator()(const create_invite_operation& op) {
+            impacted.insert(op.creator);
+        }
+
+        void operator()(const claim_invite_balance_operation& op) {
+            impacted.insert(op.receiver);
+        }
+
+        void operator()(const invite_registration_operation& op) {
+            impacted.insert(op.new_account_name);
+        }
+
+        void operator()(const use_invite_balance_operation& op) {
+            impacted.insert(op.receiver);
+        }
+
+        void operator()(const expire_escrow_ratification_operation& op) {
+            impacted.insert(op.from);
+            impacted.insert(op.to);
+            impacted.insert(op.agent);
         }
         //void operator()( const operation& op ){}
     };
