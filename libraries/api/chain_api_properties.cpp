@@ -28,6 +28,15 @@ namespace graphene { namespace api {
             witness_miss_penalty_percent=src.witness_miss_penalty_percent;
             witness_miss_penalty_duration=src.witness_miss_penalty_duration;
         }
+        if (db.has_hardfork(CHAIN_HARDFORK_9)) {
+            create_invite_min_balance=src.create_invite_min_balance;
+            committee_create_request_fee=src.committee_create_request_fee;
+            create_paid_subscription_fee=src.create_paid_subscription_fee;
+            account_on_sale_fee=src.account_on_sale_fee;
+            subaccount_on_sale_fee=src.subaccount_on_sale_fee;
+            witness_declaration_fee=src.witness_declaration_fee;
+            withdraw_intervals=src.withdraw_intervals;
+        }
     }
 
 } } // graphene::api
