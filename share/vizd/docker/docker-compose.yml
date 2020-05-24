@@ -1,0 +1,73 @@
+# With this file you can up viz node with nginx proxy and ssl sertificate.
+# Parameter VERSION now can be: lowmem, mongo, production, testnet
+#
+# Usage example:
+#
+# VERSION=testnet \
+# HOST=testnet.viz.cx \
+# EMAIL=my@email \
+# docker-compose -f share/vizd/docker/docker-compose.yml up -d
+#
+
+version: '2'
+
+services:
+  vizd:
+    build:
+      context: ../../../
+      dockerfile: ./share/vizd/docker/Dockerfile-${VERSION}
+    container_name: vizd
+    restart: unless-stopped
+    ports:
+      - "2001:2001"
+      - "8090:8090"
+      - "8091:8091"
+    networks:
+      - viz-network
+
+  viznginx:
+    image: nginx:mainline-alpine
+    container_name: viz-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf.template:/nginx.conf.template
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - webroot:/var/www/html
+    depends_on:
+      - vizd
+    networks:
+      - viz-network
+    environment:
+      - HOST
+      - PORT
+    command: >
+      sh -c "
+      export DOLLAR_SIGN='$$';
+      envsubst < nginx.conf.template > /etc/nginx/nginx.conf;
+      nginx -g 'daemon off;'
+      "
+  
+  vizcertbot:
+    image: certbot/certbot
+    container_name: viz-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - webroot:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging -d ${HOST} -d www.${HOST}
+    depends_on:
+      - viznginx
+
+
+
+volumes:
+  certbot-etc:
+  certbot-var:
+
+networks:
+  viz-network:
+    driver: bridge

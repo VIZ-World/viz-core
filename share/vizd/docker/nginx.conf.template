@@ -1,0 +1,81 @@
+events {
+    worker_connections 1024;
+}
+http {
+    server {
+        server_name ${HOST};
+        listen 80;
+        listen 443 ssl;
+        ssl_certificate /etc/letsencrypt/live/${HOST}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${HOST}/privkey.pem;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+        location ~ /.well-known/acme-challenge {
+            allow all;
+            root /var/www/html;
+        }
+
+        location / {
+            if (${DOLLAR_SIGN}request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain; charset=utf-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+            if (${DOLLAR_SIGN}request_method = 'POST') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+            }
+            if (${DOLLAR_SIGN}request_method = 'GET') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+            }
+            proxy_http_version 1.1;
+            proxy_set_header Host ${DOLLAR_SIGN}host;
+            proxy_set_header X-Real-IP ${DOLLAR_SIGN}remote_addr;
+            proxy_set_header X-Forwarded-For ${DOLLAR_SIGN}proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto ${DOLLAR_SIGN}scheme;
+            proxy_pass http://vizd:8090;
+        }
+
+        location /ws {
+            if (${DOLLAR_SIGN}request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain; charset=utf-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+            if (${DOLLAR_SIGN}request_method = 'POST') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+            }
+            if (${DOLLAR_SIGN}request_method = 'GET') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+            }
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade ${DOLLAR_SIGN}http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host ${DOLLAR_SIGN}host;
+            proxy_set_header X-Real-IP ${DOLLAR_SIGN}remote_addr;
+            proxy_set_header X-Forwarded-For ${DOLLAR_SIGN}proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto ${DOLLAR_SIGN}scheme;
+            proxy_pass http://vizd:8091;
+            proxy_read_timeout 3600;
+        }
+    }
+}
