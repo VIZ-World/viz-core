@@ -67,6 +67,7 @@ services:
 volumes:
   certbot-etc:
   certbot-var:
+  webroot:
 
 networks:
   viz-network:
