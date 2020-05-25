@@ -28,7 +28,6 @@ services:
   vizcertbot:
     image: certbot/certbot
     container_name: viz-certbot
-    restart: unless-stopped
     volumes:
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt
