@@ -35,10 +35,10 @@ services:
       - web-root:/var/www/html
     command: >
       sh -c "
-      certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging --keep-until-expiring -d ${HOST};
+      certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging --renew-by-default --non-interactive -d ${HOST};
       trap exit TERM;
       while :;
-      do certbot renew;
+      do renew;
       sleep 12h & wait $${!};
       done;
       "
