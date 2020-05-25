@@ -5,7 +5,7 @@
 #
 # VERSION=testnet \
 # HOST=testnet.viz.cx \
-# EMAIL=my@email \
+# EMAIL=my@email.com \
 # docker-compose -f share/vizd/docker/docker-compose.yml up -d
 #
 
@@ -24,6 +24,15 @@ services:
       - "8091:8091"
     networks:
       - viz-network
+  
+  vizcertbot:
+    image: certbot/certbot
+    container_name: viz-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging --keep-until-expiring -d ${HOST}
 
   viznginx:
     image: nginx:mainline-alpine
@@ -33,12 +42,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf.template:/nginx.conf.template
+      - ./letsencrypt-nginx.conf.template:/letsencrypt-nginx.conf.template
+      - ./viz-nginx.conf.template:/viz-nginx.conf.template
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt
-      - webroot:/var/www/html
-    depends_on:
-      - vizd
+      - web-root:/var/www/html
     networks:
       - viz-network
     environment:
@@ -47,27 +55,20 @@ services:
     command: >
       sh -c "
       export DOLLAR_SIGN='$$';
-      envsubst < nginx.conf.template > /etc/nginx/nginx.conf;
-      nginx -g 'daemon off;'
+      envsubst < letsencrypt-nginx.conf.template > /etc/nginx/nginx.conf;
+      nginx -g 'daemon off;';
+      sleep 10;
+      envsubst < viz-nginx.conf.template > /etc/nginx/nginx.conf;
+      nginx -s reload;
       "
-  
-  vizcertbot:
-    image: certbot/certbot
-    container_name: viz-certbot
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - webroot:/var/www/html
-    command: certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging -d ${HOST} -d www.${HOST}
     depends_on:
-      - viznginx
-
-
+      - vizd
+      - vizcertbot
 
 volumes:
   certbot-etc:
   certbot-var:
-  webroot:
+  web-root:
 
 networks:
   viz-network:
