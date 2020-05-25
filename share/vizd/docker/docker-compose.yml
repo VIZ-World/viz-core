@@ -57,7 +57,7 @@ services:
       export DOLLAR_SIGN='$$';
       envsubst < letsencrypt-nginx.conf.template > /etc/nginx/nginx.conf;
       nginx -g 'daemon off;';
-      sleep 10;
+      sleep 30;
       envsubst < viz-nginx.conf.template > /etc/nginx/nginx.conf;
       nginx -s reload;
       "
