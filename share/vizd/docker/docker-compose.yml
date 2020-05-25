@@ -33,15 +33,7 @@ services:
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt
       - web-root:/var/www/html
-    command: >
-      sh -c "
-      certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging --renew-by-default --non-interactive -d ${HOST};
-      trap exit TERM;
-      while :;
-      do renew;
-      sleep 12h & wait $${!};
-      done;
-      "
+    command: certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --staging --renew-by-default --non-interactive -d ${HOST}
 
   viznginx:
     image: nginx:mainline-alpine
