@@ -49,6 +49,8 @@ services:
       - web-root:/var/www/html
     networks:
       - viz-network
+    environment:
+      - HOST
     command: >
       sh -c "
       export DOLLAR_SIGN='$$';
