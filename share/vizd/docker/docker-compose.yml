@@ -49,17 +49,15 @@ services:
       - web-root:/var/www/html
     networks:
       - viz-network
-    environment:
-      - HOST
-      - PORT
     command: >
       sh -c "
       export DOLLAR_SIGN='$$';
       envsubst < letsencrypt-nginx.conf.template > /etc/nginx/nginx.conf;
-      nginx -g 'daemon off;';
-      sleep 30;
+      nginx -g 'daemon on;';
+      sleep 15;
+      nginx -s 'stop';
       envsubst < viz-nginx.conf.template > /etc/nginx/nginx.conf;
-      nginx -s reload;
+      nginx -g 'daemon off;';
       "
     depends_on:
       - vizd

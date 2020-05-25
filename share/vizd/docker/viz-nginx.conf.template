@@ -3,9 +3,9 @@ events {
 }
 http {
     server {
+        server_name ${HOST};
         listen 80;
         listen [::]:80;
-        server_name ${HOST};
 
         location ~ /.well-known/acme-challenge {
             allow all;
