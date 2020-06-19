@@ -49,8 +49,8 @@ namespace graphene { namespace protocol {
         account_name_type author;
         std::string title;
         std::string memo;
-        std::vector<operation_wrapper> proposed_operations;
         time_point_sec expiration_time;
+        std::vector<operation_wrapper> proposed_operations;
         optional<time_point_sec> review_period_time;
         extensions_type extensions;
 
