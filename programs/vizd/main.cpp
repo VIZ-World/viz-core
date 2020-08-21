@@ -27,6 +27,7 @@
 #include <graphene/plugins/committee_api/committee_api.hpp>
 #include <graphene/plugins/invite_api/invite_api.hpp>
 #include <graphene/plugins/paid_subscription_api/paid_subscription_api.hpp>
+#include <graphene/plugins/custom_protocol_api/custom_protocol_api.hpp>
 
 #include <fc/interprocess/signals.hpp>
 #include <fc/log/console_appender.hpp>
@@ -84,6 +85,7 @@ namespace graphene {
             appbase::app().register_plugin<graphene::plugins::committee_api::committee_api>();
             appbase::app().register_plugin<graphene::plugins::invite_api::invite_api>();
             appbase::app().register_plugin<graphene::plugins::paid_subscription_api::paid_subscription_api>();
+            appbase::app().register_plugin<graphene::plugins::custom_protocol_api::custom_protocol_api_plugin>();
             ///plugins
         };
     }
