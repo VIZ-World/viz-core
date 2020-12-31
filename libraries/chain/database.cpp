@@ -1413,7 +1413,7 @@ namespace graphene { namespace chain {
                         else{
                             if(actual_rshares<=0){//negative result
                                 modify(cur_request, [&](committee_request_object &c) {
-                                    c.conclusion_payout_amount=conclusion_payout_amount;
+                                    c.conclusion_payout_amount=asset(0,TOKEN_SYMBOL);
                                     c.conclusion_time = head_block_time();
                                     c.status = 3;
                                 });
