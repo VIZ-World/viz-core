@@ -88,7 +88,7 @@
 
 #define CHAIN_MIN_ACCOUNT_NAME_LENGTH         2
 #define CHAIN_CREATE_MIN_ACCOUNT_NAME_LENGTH  3
-#define CHAIN_MAX_ACCOUNT_NAME_LENGTH         25
+#define CHAIN_MAX_ACCOUNT_NAME_LENGTH         32
 
 #define CHAIN_MAX_URL_LENGTH                  256
 #define CHAIN_MAX_MEMO_LENGTH                 2048
