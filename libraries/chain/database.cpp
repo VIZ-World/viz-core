@@ -1411,9 +1411,7 @@ namespace graphene { namespace chain {
                             push_virtual_operation(committee_cancel_request_operation(cur_request.request_id));
                         }
                         else{
-                            calculated_payment=( ( fc::uint128_t(cur_request.required_amount_max.amount) * ( fc::uint128_t(CHAIN_100_PERCENT) * fc::uint128_t(actual_rshares) / fc::uint128_t(max_rshares) ) ) / fc::uint128_t(CHAIN_100_PERCENT) ).to_uint64();
-                            asset conclusion_payout_amount = asset(calculated_payment, TOKEN_SYMBOL);
-                            if(cur_request.required_amount_min.amount > conclusion_payout_amount.amount){
+                            if(actual_rshares<=0){//negative result
                                 modify(cur_request, [&](committee_request_object &c) {
                                     c.conclusion_payout_amount=conclusion_payout_amount;
                                     c.conclusion_time = head_block_time();
@@ -1422,13 +1420,25 @@ namespace graphene { namespace chain {
                                 push_virtual_operation(committee_cancel_request_operation(cur_request.request_id));
                             }
                             else{
-                                modify(cur_request, [&](committee_request_object &c) {
-                                    c.conclusion_payout_amount=conclusion_payout_amount;
-                                    c.conclusion_time = head_block_time();
-                                    c.remain_payout_amount=conclusion_payout_amount;
-                                    c.status = 4;
-                                });
-                                push_virtual_operation(committee_approve_request_operation(cur_request.request_id));
+                                calculated_payment=( ( fc::uint128_t(cur_request.required_amount_max.amount) * ( fc::uint128_t(CHAIN_100_PERCENT) * fc::uint128_t(actual_rshares) / fc::uint128_t(max_rshares) ) ) / fc::uint128_t(CHAIN_100_PERCENT) ).to_uint64();
+                                asset conclusion_payout_amount = asset(calculated_payment, TOKEN_SYMBOL);
+                                if(cur_request.required_amount_min.amount > conclusion_payout_amount.amount){
+                                    modify(cur_request, [&](committee_request_object &c) {
+                                        c.conclusion_payout_amount=conclusion_payout_amount;
+                                        c.conclusion_time = head_block_time();
+                                        c.status = 3;
+                                    });
+                                    push_virtual_operation(committee_cancel_request_operation(cur_request.request_id));
+                                }
+                                else{
+                                    modify(cur_request, [&](committee_request_object &c) {
+                                        c.conclusion_payout_amount=conclusion_payout_amount;
+                                        c.conclusion_time = head_block_time();
+                                        c.remain_payout_amount=conclusion_payout_amount;
+                                        c.status = 4;
+                                    });
+                                    push_virtual_operation(committee_approve_request_operation(cur_request.request_id));
+                                }
                             }
                         }
                     }
