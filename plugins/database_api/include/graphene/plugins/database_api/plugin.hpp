@@ -96,9 +96,11 @@ struct account_on_sale_api_object {
     std::string account;
     std::string account_seller;
     asset account_offer_price = asset(0, TOKEN_SYMBOL);
+    time_point_sec account_on_sale_start_time = fc::time_point_sec::min();
 
     account_on_sale_api_object(const graphene::chain::account_object &a)
-    :   account(a.name), account_seller(a.account_seller), account_offer_price(a.account_offer_price){
+    :   account(a.name), account_seller(a.account_seller), account_offer_price(a.account_offer_price),
+        account_on_sale_start_time(a.account_on_sale_start_time){
     }
 
 
@@ -394,5 +396,5 @@ FC_REFLECT((graphene::plugins::database_api::signed_block_api_object), (block_id
 FC_REFLECT((graphene::plugins::database_api::database_index_info), (name)(record_count))
 FC_REFLECT((graphene::plugins::database_api::database_info), (total_size)(free_size)(reserved_size)(used_size)(index_list))
 
-FC_REFLECT((graphene::plugins::database_api::account_on_sale_api_object), (account)(account_seller)(account_offer_price))
+FC_REFLECT((graphene::plugins::database_api::account_on_sale_api_object), (account)(account_seller)(account_offer_price)(account_on_sale_start_time))
 FC_REFLECT((graphene::plugins::database_api::subaccount_on_sale_api_object), (account)(subaccount_seller)(subaccount_offer_price))

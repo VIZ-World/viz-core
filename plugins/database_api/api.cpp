@@ -424,7 +424,9 @@ DEFINE_API(plugin, get_accounts_on_sale) {
         auto itr = idx.lower_bound(true);
         while(from>0 && itr != idx.end() && itr->account_on_sale == true){
             ++itr;
-            from--;
+            if(itr->account_on_sale_start_time <= my->database().head_block_time()){
+                from--;
+            }
         }
         while (result.size() < limit && itr != idx.end() && itr->account_on_sale == true) {
             if(itr->account_on_sale_start_time <= my->database().head_block_time()){
