@@ -3490,6 +3490,12 @@ namespace graphene { namespace chain {
                             CHAIN_MAX_RESERVE_RATIO) {
                             dgp.current_reserve_ratio = CHAIN_MAX_RESERVE_RATIO;
                         }
+
+                        //Add minimum reserve ratio (10% from maximum) for preventing spam causes too big falls for small network activity
+                        if (dgp.current_reserve_ratio <
+                            ( CHAIN_MAX_RESERVE_RATIO / 10 ) ) {
+                            dgp.current_reserve_ratio = CHAIN_MAX_RESERVE_RATIO / 10;
+                        }
                     }
                     dgp.max_virtual_bandwidth = (dgp.maximum_block_size *
                                                  dgp.current_reserve_ratio *

@@ -1479,6 +1479,10 @@ namespace graphene { namespace chain {
             const auto& delegatee = _db.get_account(op.delegatee);
             auto delegation = _db.find<vesting_delegation_object, by_delegation>(std::make_tuple(op.delegator, op.delegatee));
 
+            if ( delegation == nullptr ) {
+                FC_ASSERT(op.vesting_shares.amount != 0,"Delegation did not exist for initiate revoke.");
+            }
+
             const auto& median_props = _db.get_witness_schedule_object().median_props;
             const auto v_share_price = _db.get_dynamic_global_properties().get_vesting_share_price();
             auto min_delegation = median_props.min_delegation * v_share_price;
