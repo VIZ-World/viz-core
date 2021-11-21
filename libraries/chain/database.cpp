@@ -3619,6 +3619,9 @@ namespace graphene { namespace chain {
             while (itr != delegations_by_exp.end() && itr->expiration < now) {
                 modify(get_account(itr->delegator), [&](account_object& a) {
                     a.delegated_vesting_shares -= itr->vesting_shares;
+                    if(has_hardfork(CHAIN_HARDFORK_10)){
+                        shares_sender_recalc_energy(a,itr->vesting_shares);
+                    }
                 });
                 push_virtual_operation(return_vesting_delegation_operation(itr->delegator, itr->vesting_shares));
                 remove(*itr);
@@ -3734,6 +3737,9 @@ namespace graphene { namespace chain {
 
             _hardfork_times[CHAIN_HARDFORK_9] = fc::time_point_sec(CHAIN_HARDFORK_9_TIME);
             _hardfork_versions[CHAIN_HARDFORK_9] = CHAIN_HARDFORK_9_VERSION;
+
+            _hardfork_times[CHAIN_HARDFORK_10] = fc::time_point_sec(CHAIN_HARDFORK_10_TIME);
+            _hardfork_versions[CHAIN_HARDFORK_10] = CHAIN_HARDFORK_10_VERSION;
 
             const auto &hardforks = get_hardfork_property_object();
             FC_ASSERT(
@@ -4582,6 +4588,8 @@ namespace graphene { namespace chain {
                     }
                     break;
                 }
+                case CHAIN_HARDFORK_10:
+                    break;
                 default:
                     break;
             }
