@@ -1535,7 +1535,13 @@ namespace graphene { namespace chain {
                 _db.create<vesting_delegation_expiration_object>([&](vesting_delegation_expiration_object& o) {
                     o.delegator = op.delegator;
                     o.vesting_shares = -delta;
-                    o.expiration = std::max(now + CHAIN_CASHOUT_WINDOW_SECONDS, delegation->min_delegation_time);
+                    if(_db.has_hardfork(CHAIN_HARDFORK_10)){
+                        o.expiration = std::max(now + CHAIN_ENERGY_REGENERATION_SECONDS, delegation->min_delegation_time);
+                    }
+                    else{
+                        //old math: possible "double" energy spend in delegation by difference between CHAIN_ENERGY_REGENERATION_SECONDS and CHAIN_CASHOUT_WINDOW_SECONDS
+                        o.expiration = std::max(now + CHAIN_CASHOUT_WINDOW_SECONDS, delegation->min_delegation_time);
+                    }
                 });
             }
 

@@ -2,7 +2,7 @@
 
 #define CHAIN_STARTUP_VERSION                 (version(1, 0, 0))
 #define CHAIN_HARDFORK_STARTUP_VERSION        (hardfork_version(CHAIN_STARTUP_VERSION))
-#define CHAIN_VERSION                         (version(2, 5, 0))
+#define CHAIN_VERSION                         (version(2, 6, 0))
 #define CHAIN_HARDFORK_VERSION                (hardfork_version(CHAIN_VERSION))
 
 #define CHAIN_NAME                            "VIZ"
@@ -11,8 +11,6 @@
 
 #define SHARES_SYMBOL  (uint64_t(6) | (uint64_t('S') << 8) | (uint64_t('H') << 16) | (uint64_t('A') << 24) | (uint64_t('R') << 32) | (uint64_t('E') << 40) | (uint64_t('S') << 48))
 #define TOKEN_SYMBOL  (uint64_t(3) | (uint64_t('V') << 8) | (uint64_t('I') << 16) | (uint64_t('Z') << 24))
-
-#define CHAIN_CASHOUT_WINDOW_SECONDS          (60*60*24)  // 1 day
 
 #define CHAIN_MAX_PROPOSAL_LIFETIME_SEC       (60*60*24*7*4) /// 4 weeks
 #define CHAIN_MAX_PROPOSAL_DEPTH              (2)
@@ -159,3 +157,6 @@
 /// Represents the canonical root post parent account
 #define CHAIN_ROOT_POST_PARENT                (account_name_type())
 ///@}
+
+// Deprecated defines
+#define CHAIN_CASHOUT_WINDOW_SECONDS          (60*60*24)  // 1 day
