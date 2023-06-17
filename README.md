@@ -2,7 +2,7 @@
 
 ![Build docker images](https://github.com/VIZ-Blockchain/viz-cpp-node/workflows/Build%20docker%20images/badge.svg)
 
-VIZ is a DPOS blockchain with an unproven consensus algorithm (Fair DPOS with witness penalty for missing block).
+VIZ is a Graphene blockchain with a Fair-DPOS consensus algorithm (vote weight splitted to selected witnesses, witness gets a penalty for missing a block).
 
 ## Building
 
