@@ -39,6 +39,10 @@ namespace graphene {
 
                 void broadcast_block(const graphene::protocol::signed_block &block);
 
+                void broadcast_block_post_validation(const graphene::protocol::block_id_type &block_id,
+                    const std::string &witness_account,
+                    const graphene::protocol::signature_type &witness_signature);
+
                 void broadcast_transaction(const graphene::protocol::signed_transaction &tx);
 
                 void set_block_production(bool producing_blocks);

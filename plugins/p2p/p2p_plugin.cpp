@@ -23,6 +23,7 @@ namespace graphene {
             using graphene::network::item_id;
             using graphene::network::message;
             using graphene::network::block_message;
+            using graphene::network::block_post_validation_message;
             using graphene::network::trx_message;
 
             using graphene::protocol::block_header;
@@ -31,6 +32,8 @@ namespace graphene {
             using graphene::protocol::block_id_type;
             using graphene::chain::database;
             using graphene::chain::chain_id_type;
+
+            using graphene::protocol::signature_type;
 
             namespace detail {
 
@@ -545,6 +548,13 @@ namespace graphene {
             void p2p_plugin::broadcast_block(const protocol::signed_block &block) {
                 ulog("Broadcasting block #${n}", ("n", block.block_num()));
                 my->node->broadcast(block_message(block));
+            }
+
+            void p2p_plugin::broadcast_block_post_validation(const network::block_id_type &block_id,
+                    const std::string &witness_account,
+                    const protocol::signature_type &witness_signature) {
+                ulog("Broadcasting block post validation #${n}", ("n", block_id));
+                my->node->broadcast(block_post_validation_message(block_id,witness_account,witness_signature));
             }
 
             void p2p_plugin::broadcast_transaction(const protocol::signed_transaction &tx) {

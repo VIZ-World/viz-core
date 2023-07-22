@@ -46,6 +46,7 @@ namespace graphene {
         using graphene::protocol::block_id_type;
         using graphene::protocol::transaction_id_type;
         using graphene::protocol::signed_block;
+        using graphene::protocol::signature_type;
 
         typedef fc::ecc::public_key_data node_id_t;
         typedef fc::ripemd160 item_hash_t;
@@ -89,7 +90,8 @@ namespace graphene {
             check_firewall_reply_message_type = 5015,
             get_current_connections_request_message_type = 5016,
             get_current_connections_reply_message_type = 5017,
-            core_message_type_last = 5099
+            core_message_type_last = 5099,
+            block_post_validation_message_type = 6009,//just pass to process_ordinary_message
         };
 
         const uint32_t core_protocol_version = GRAPHENE_NET_PROTOCOL_VERSION;
@@ -120,6 +122,26 @@ namespace graphene {
             signed_block block;
             block_id_type block_id;
 
+        };
+
+        struct block_post_validation_message {
+            static const core_message_type_enum type;
+
+            block_post_validation_message() {
+            }
+
+            block_post_validation_message(
+                    const block_id_type &block_id,
+                    const std::string &witness_account,
+                    const signature_type &witness_signature) :
+                    block_id(block_id),
+                    witness_account(witness_account),
+                    witness_signature(witness_signature) {
+            }
+
+            block_id_type block_id;
+            std::string witness_account;
+            signature_type witness_signature;
         };
 
         struct item_ids_inventory_message {
@@ -444,10 +466,12 @@ FC_REFLECT_ENUM(graphene::network::core_message_type_enum,
                 (check_firewall_reply_message_type)
                 (get_current_connections_request_message_type)
                 (get_current_connections_reply_message_type)
-                (core_message_type_last))
+                (core_message_type_last)
+                (block_post_validation_message_type))
 
 FC_REFLECT((graphene::network::trx_message), (trx))
 FC_REFLECT((graphene::network::block_message), (block)(block_id))
+FC_REFLECT((graphene::network::block_post_validation_message), (block_id)(witness_account)(witness_signature))
 
 FC_REFLECT((graphene::network::item_id), (item_type)
         (item_hash))
