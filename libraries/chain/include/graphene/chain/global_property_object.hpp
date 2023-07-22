@@ -95,6 +95,10 @@ namespace graphene {
             uint8_t participation_count = 0; ///< Divide by 128 to compute participation percentage
 
             uint32_t last_irreversible_block_num = 0;
+            block_id_type last_irreversible_block_id;
+
+            uint16_t last_irreversible_block_ref_num = 0;
+            uint32_t last_irreversible_block_ref_prefix = 0;
 
             /**
              * The maximum bandwidth the blockchain can support is:
@@ -161,6 +165,9 @@ FC_REFLECT((graphene::chain::dynamic_global_property_object),
                 (recent_slots_filled)
                 (participation_count)
                 (last_irreversible_block_num)
+                (last_irreversible_block_id)
+                (last_irreversible_block_ref_num)
+                (last_irreversible_block_ref_prefix)
                 (max_virtual_bandwidth)
                 (current_reserve_ratio)
                 (vote_regeneration_per_day)

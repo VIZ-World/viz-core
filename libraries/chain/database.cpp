@@ -22,6 +22,7 @@
 #include <graphene/chain/invite_objects.hpp>
 #include <graphene/chain/paid_subscription_objects.hpp>
 
+#include <fc/bitutil.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 #include <fc/container/deque.hpp>
@@ -3569,6 +3570,9 @@ namespace graphene { namespace chain {
                     dpo.last_irreversible_block_num) {
                     modify(dpo, [&](dynamic_global_property_object &_dpo) {
                         _dpo.last_irreversible_block_num = new_last_irreversible_block_num;
+                        _dpo.last_irreversible_block_id = block_id_type();
+                        _dpo.last_irreversible_block_ref_num = 0;
+                        _dpo.last_irreversible_block_ref_prefix = 0;
                     });
                 }
 
@@ -3594,6 +3598,19 @@ namespace graphene { namespace chain {
 
                         _block_log.flush();
                     }
+                }
+
+                //modify dpo after block log commit
+                if (new_last_irreversible_block_num == dpo.last_irreversible_block_num) {
+                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                        if (irreversible_block.valid()) {
+                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                        }
+                    });
                 }
 
                 _fork_db.set_max_size(dpo.head_block_number -
