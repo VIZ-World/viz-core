@@ -4,6 +4,7 @@
 #include <graphene/chain/database_exceptions.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/chain_objects.hpp>
+#include <graphene/chain/chain_object_types.hpp>
 #include <graphene/chain/witness_objects.hpp>
 #include <graphene/time/time.hpp>
 
@@ -112,6 +113,8 @@ namespace graphene {
 
                 std::map<public_key_type, fc::ecc::private_key> _private_keys;
                 std::set<string> _witnesses;
+
+                fc::time_point last_block_post_validation_time;
             };
 
             void witness_plugin::set_program_options(
@@ -286,6 +289,47 @@ namespace graphene {
                     }
                 }
 
+                //try get block post validation list for each witness
+                //if witness can validate it, sign chain_id and block_id for message
+                //broadcast validation message by p2p plugin
+                if(last_block_post_validation_time < now_fine ){
+                    last_block_post_validation_time = now;
+                    //ilog("! tick last_block_post_validation_time");
+                    //get block post validation for each witness we have
+                    for (auto &witness_account : _witnesses) {
+                        bool ignore_witness = false;
+                        auto block_post_validations = db.get_block_post_validations(witness_account);
+                        if (block_post_validations.size() > 0) {
+                            const auto &witness_by_name = db.get_index<graphene::chain::witness_index>().indices().get<graphene::chain::by_name>();
+                            auto w_itr = witness_by_name.find(witness_account);
+                            graphene::protocol::public_key_type witness_pub_key = w_itr->signing_key;
+                            auto private_key_itr = _private_keys.find(witness_pub_key);
+
+                            if (private_key_itr == _private_keys.end()) {
+                                ilog("No private key to public ${p} for ${w}", ("p", witness_pub_key)("w", witness_account));
+                                ignore_witness= true;
+                            }
+                            if(!ignore_witness){
+                                graphene::protocol::private_key_type witness_priv_key = private_key_itr->second;
+                                //we have block post validations for this witness
+                                //check if we have a block
+                                for(uint8_t i = 0; i < block_post_validations.size(); i++) {
+                                    if(0 != block_post_validations[i].block_num){
+                                        if(block_post_validations[i].block_id != block_id_type()){
+                                            graphene::protocol::digest_type::encoder enc;
+                                            fc::raw::pack(enc, db.get_chain_id().str().append(block_post_validations[i].block_id.str()));
+                                            //sign the enc by witness_priv_key
+                                            graphene::protocol::signature_type bpv_signature = witness_priv_key.sign_compact(enc.result());
+                                            //ilog("Witness ${w} signed block post validation #${n} ${b} with signature ${s}", ("w", witness_account)("n", block_post_validations[i].block_num)("b", block_post_validations[i].block_id)("s", bpv_signature));
+                                            p2p().broadcast_block_post_validation(block_post_validations[i].block_id, witness_account, bpv_signature);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // is anyone scheduled to produce now or one second in the future?
                 uint32_t slot = db.get_slot_at_time(now);
                 if (slot == 0) {
@@ -363,4 +407,3 @@ namespace graphene {
         }
     }
 }
-

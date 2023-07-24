@@ -4917,6 +4917,7 @@ namespace graphene {
                     hash_of_message_contents = transaction_message_to_broadcast.trx.id(); // for debugging
                     dlog("broadcasting trx: ${trx}", ("trx", transaction_message_to_broadcast));
                 }
+
                 message_hash_type hash_of_item_to_broadcast = item_to_broadcast.id();
 
                 _message_cache.cache_message(item_to_broadcast, hash_of_item_to_broadcast, propagation_data, hash_of_message_contents);

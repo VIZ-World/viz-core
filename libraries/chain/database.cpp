@@ -2640,6 +2640,7 @@ namespace graphene { namespace chain {
             add_core_index<paid_subscription_index>(*this);
             add_core_index<paid_subscribe_index>(*this);
             add_core_index<witness_penalty_expire_index>(*this);
+            add_core_index<block_post_validation_index>(*this);
 
             _plugin_index_signal();
         }
@@ -3002,6 +3003,11 @@ namespace graphene { namespace chain {
             return skip;
         }
 
+
+        public_key_type database::get_witness_key(const account_name_type& name) {
+            return get_witness(name).signing_key;
+        }
+
         void database::_validate_transaction(const signed_transaction &trx, uint32_t skip) {
             if (!(skip & skip_validate_operations)) {   /* issue #505 explains why this skip_flag is disabled */
                 trx.validate();
@@ -3156,7 +3162,7 @@ namespace graphene { namespace chain {
                 uint32_t next_block_num = next_block.block_num();
                 const auto &gprops = get_dynamic_global_properties();
                 const auto &hardfork_state = get_hardfork_property_object();
-                //block_id_type next_block_id = next_block.id();
+                block_id_type next_block_id = block_id_type(next_block.id());
 
                 _validate_block(next_block, skip);
 
@@ -3241,6 +3247,8 @@ namespace graphene { namespace chain {
                 committee_processing();
                 paid_subscribe_processing();
                 process_hardforks();
+                create_block_post_validation(next_block_num,next_block_id,next_block.witness);
+                check_block_post_validation_chain();
 
                 // notify observers that the block has been applied
                 notify_applied_block(next_block);
@@ -3516,6 +3524,274 @@ namespace graphene { namespace chain {
                         ("max_undo", CHAIN_MAX_UNDO_HISTORY));
                 }
             } FC_CAPTURE_AND_RETHROW()
+        }
+
+        //after block is applied check block post validation chain step by step
+        //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
+        void database::check_block_post_validation_chain(){
+            const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+            const witness_schedule_object &wso = get_witness_schedule_object();
+
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            if(!validation_list.empty()){
+                auto itr = validation_list.begin();
+                while(itr != validation_list.end())
+                {
+                    bool remove_validated = false;
+                    const auto& current = *itr;
+                    if((1 + dpo.last_irreversible_block_num) == current.block_num){
+                        int count=0;
+                        for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                            if(current.current_shuffled_witnesses[j] == account_name_type()){//already validated
+                                count++;
+                            }
+                        }
+                        if(count >= (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
+                            try {
+                                modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                    _dpo.last_irreversible_block_num = current.block_num;
+                                    _dpo.last_irreversible_block_id = block_id_type();
+                                    _dpo.last_irreversible_block_ref_num = 0;
+                                    _dpo.last_irreversible_block_ref_prefix = 0;
+                                });
+
+                                commit(dpo.last_irreversible_block_num);
+                                //ilog("!!! NEW irreversible block: ${num} ${id}", ("num", current.block_num)("id", current.block_id));
+
+                                // output to block log based on new last irreverisible block num
+                                const auto &tmp_head = _block_log.head();
+                                uint64_t log_head_num = 0;
+
+                                if (tmp_head) {
+                                    log_head_num = tmp_head->block_num();
+                                }
+
+                                if (log_head_num < dpo.last_irreversible_block_num) {
+                                    while (log_head_num < dpo.last_irreversible_block_num) {
+                                        std::shared_ptr<fork_item> block = _fork_db.fetch_block_on_main_branch_by_number(
+                                                log_head_num + 1);
+                                        FC_ASSERT(block, "Current fork in the fork database does not contain the last_irreversible_block");
+                                        _block_log.append(block->data);
+                                        log_head_num++;
+                                    }
+
+                                    _block_log.flush();
+                                }
+
+                                //modify dpo after block log commit
+                                if (current.block_num == dpo.last_irreversible_block_num) {
+                                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                                        if (irreversible_block.valid()) {
+                                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                                        }
+                                    });
+                                }
+
+                                _fork_db.set_max_size(dpo.head_block_number -
+                                                    dpo.last_irreversible_block_num + 1);
+                                remove_validated=true;
+                            } FC_CAPTURE_AND_RETHROW()
+                        }
+                    }
+                    itr++;
+                    if(remove_validated){
+                        remove(current);
+                    }
+                }
+            }
+        }
+
+        //p2p plugin check witness signature on handle_message
+        //and apply block post validation for block id by witness account
+        //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
+        void database::apply_block_post_validation(block_id_type block_id, const account_name_type &witness_account){
+            //ilog("apply_block_post_validation block_id:${block_id} witness_account:${witness_account}", ("block_id", block_id)("witness_account", witness_account));
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            if(!validation_list.empty()){
+                auto itr = validation_list.begin();
+                bool find = false;
+                uint32_t find_block_num = 0;
+                auto find_obj = *itr;
+                int count = 0;
+                while(itr != validation_list.end())
+                {
+                    const auto& current = *itr;
+                    if(current.block_id == block_id){
+                        find_block_num = current.block_num;
+                        modify(current, [&](block_post_validation_object &o) {
+                            //remove witness from shuffled witnesses
+                            for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                                if(o.current_shuffled_witnesses[j] == witness_account){
+                                    o.current_shuffled_witnesses[j] = account_name_type();//empty
+                                    find = true;
+                                    find_obj=*itr;
+                                }
+                                if(o.current_shuffled_witnesses[j] == account_name_type()){//already validated
+                                    count++;
+                                }
+                            }
+                        });
+                        break;
+                    }
+                    ++itr;
+                }
+                if(find){
+                    //ilog("! Validations count  ${count}", ("count", count));
+                    const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+                    //ilog("last_irreversible_block_num  ${num}", ("num", (1 + dpo.last_irreversible_block_num)));
+                    //ilog("find_block_num  ${num}", ("num", (find_block_num)));
+                    if((1 + dpo.last_irreversible_block_num) == find_block_num){
+                        //ilog("! block num ${num} is step behind of irreversible", ("num", find_block_num));
+                        const witness_schedule_object &wso = get_witness_schedule_object();
+                        if(count >= (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
+                            //ilog("! count is more than ${calc}", ("calc", (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)));
+                            try {
+                                modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                    _dpo.last_irreversible_block_num = find_block_num;
+                                    _dpo.last_irreversible_block_id = block_id_type();
+                                    _dpo.last_irreversible_block_ref_num = 0;
+                                    _dpo.last_irreversible_block_ref_prefix = 0;
+                                });
+
+                                commit(dpo.last_irreversible_block_num);
+                                //ilog("!!! NEW irreversible block: ${num} ${id}", ("num", find_block_num)("id", block_id));
+
+                                // output to block log based on new last irreverisible block num
+                                const auto &tmp_head = _block_log.head();
+                                uint64_t log_head_num = 0;
+
+                                if (tmp_head) {
+                                    log_head_num = tmp_head->block_num();
+                                }
+
+                                if (log_head_num < dpo.last_irreversible_block_num) {
+                                    while (log_head_num < dpo.last_irreversible_block_num) {
+                                        std::shared_ptr<fork_item> block = _fork_db.fetch_block_on_main_branch_by_number(
+                                                log_head_num + 1);
+                                        FC_ASSERT(block, "Current fork in the fork database does not contain the last_irreversible_block");
+                                        _block_log.append(block->data);
+                                        log_head_num++;
+                                    }
+
+                                    _block_log.flush();
+                                }
+
+                                //modify dpo after block log commit
+                                if (find_block_num == dpo.last_irreversible_block_num) {
+                                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                                        if (irreversible_block.valid()) {
+                                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                                        }
+                                    });
+                                }
+
+                                _fork_db.set_max_size(dpo.head_block_number -
+                                                    dpo.last_irreversible_block_num + 1);
+                            } FC_CAPTURE_AND_RETHROW()
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        //get block post validation objects for witness
+        //return array of block_post_validation_object event if it is empty
+        std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> database::get_block_post_validations(const account_name_type &witness_account){
+            std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> result;
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            auto itr = validation_list.begin();
+            int i = 0;
+            while(itr != validation_list.end())
+            {
+                const auto& current = *itr;
+                ++itr;
+                //if witness is in the list add it to result
+                for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                    if(current.current_shuffled_witnesses[j] == witness_account){
+                        result[i] = block_post_validation_object(current);
+                        //ilog("find bplo: ${block_num}, ${block_id}, witnesses ${current_shuffled_witnesses}", ("block_num", result[i].block_num)("block_id", result[i].block_id)("current_shuffled_witnesses", result[i].current_shuffled_witnesses));
+                        ++i;
+                    }
+                }
+                /*
+                //old code, new remove witness from shuffled witnesses in apply_block_post_validation
+                modify(current, [&](block_post_validation_object &o) {
+                    //remove witness from shuffled witnesses
+                    for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                        if(o.current_shuffled_witnesses[j] == witness_account){
+                            o.current_shuffled_witnesses[j] = account_name_type();
+                        }
+                    }
+                });
+                */
+            }
+            //fill result with empty objects to return array with fixed size
+            for(; i < CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT; i++){
+                result[i] = block_post_validation_object();
+            }
+            return result;
+        }
+
+        //create block post validation object with current shuffled witnesses
+        //remove old block post validation objects
+        //remove old blocks from post validation list if it is full (CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT)
+        void database::create_block_post_validation(uint32_t block_num, block_id_type block_id, const account_name_type& witness_account){
+            //remove blocks if they height is less than last irreversible block
+            const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            auto itr1 = validation_list.begin();
+            while(itr1 != validation_list.end())
+            {
+                const auto& current = *itr1;
+                ++itr1;
+                if(current.block_num <= dpo.last_irreversible_block_num){
+                    remove(current);
+                }
+            }
+            //remove old blocks from post validation list if it is full
+            int max_block_post_validation_size = 0;
+            for (auto itr = validation_list.begin();
+                    itr != validation_list.end();
+                    ++itr) {
+                max_block_post_validation_size++;
+                /*
+                ilog(
+                    "block post validation #{n}: block ${block_num}, ${block_id}, witnesses are: ${w}",
+                    ("n", max_block_post_validation_size)("block_num", itr->block_num)("block_id", itr->block_id)("w", itr->current_shuffled_witnesses));
+                */
+                if(max_block_post_validation_size >= CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT) {
+                    const auto& first_item = *validation_list.begin();
+                    remove(first_item);//remove first element, oldest block
+                }
+            }
+            //create new block in post validation list
+            create<block_post_validation_object>([&](block_post_validation_object& o) {
+                //ilog("create_block_post_validation: block ${block_num}, ${block_id}, witness ${witness_account}", ("block_num", block_num)("block_id", block_id)("witness_account", witness_account));
+                o.block_num = block_num;
+                o.block_id = block_id_type(block_id);
+                for (int i = 0; i < CHAIN_MAX_WITNESSES; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                    o.current_shuffled_witnesses[i] = account_name_type();
+                }
+                const witness_schedule_object &wso = get_witness_schedule_object();
+                int witness_index=0;
+                for (int i = 0; i < wso.num_scheduled_witnesses; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                    if(witness_account != wso.current_shuffled_witnesses[i]){
+                        o.current_shuffled_witnesses[witness_index] = account_name_type(wso.current_shuffled_witnesses[i]);
+                        witness_index++;
+                        //ilog("success add ${i} witness", ("i", wso.current_shuffled_witnesses[i]));
+                    }
+                }
+
+            });
         }
 
         void database::update_signing_witness(const witness_object &signing_witness, const signed_block &new_block) {

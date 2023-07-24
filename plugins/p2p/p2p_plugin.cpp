@@ -22,6 +22,7 @@ namespace graphene {
             using graphene::network::item_hash_t;
             using graphene::network::item_id;
             using graphene::network::message;
+            using graphene::network::core_message_type_enum;
             using graphene::network::block_message;
             using graphene::network::block_post_validation_message;
             using graphene::network::trx_message;
@@ -170,6 +171,32 @@ namespace graphene {
 
                 void p2p_plugin_impl::handle_message(const message &message_to_process) {
                     // not a transaction, not a block
+                    //ilog("handle_message ${m}", ("m", message_to_process));
+                    if(message_to_process.msg_type == core_message_type_enum::block_post_validation_message_type){
+                        //get message_to_process as block_post_validation_message type
+                        block_post_validation_message bpvl=block_post_validation_message(message_to_process.as<block_post_validation_message>());
+                        //ilog("handle_message as bpvl ${m}", ("m", bpvl));
+
+                        //get block_id from block_post_validation_message
+                        block_id_type validate_block_id=block_id_type(bpvl.block_id);
+
+                        graphene::protocol::digest_type::encoder enc;
+                        fc::raw::pack(enc, chain.db().get_chain_id().str().append(validate_block_id.str()));
+
+                        //recover public key from signature
+                        fc::ecc::public_key recovered_public_key(bpvl.witness_signature, enc.result(), true);
+                        //get signing_key from witness_account
+                        fc::ecc::public_key w_signing_key=chain.db().get_witness_key(bpvl.witness_account);
+                        if(chain.db().get_witness_key(bpvl.witness_account) == recovered_public_key){
+                            //trigger db block validation
+                            //ilog("recovered_public_key EQUAL to witness ${w}", ("w", bpvl.witness_account));
+                            chain.db().apply_block_post_validation(validate_block_id,bpvl.witness_account);
+                        }
+                        else{//ignore
+                            //ilog("recovered_public_key NOT EQUAL to witness ${w}", ("w", bpvl.witness_account));
+                        }
+                        return;
+                    }
                     FC_THROW("Invalid Message Type");
                 }
 
@@ -550,11 +577,13 @@ namespace graphene {
                 my->node->broadcast(block_message(block));
             }
 
-            void p2p_plugin::broadcast_block_post_validation(const network::block_id_type &block_id,
+            void p2p_plugin::broadcast_block_post_validation(const network::block_id_type block_id,
                     const std::string &witness_account,
                     const protocol::signature_type &witness_signature) {
-                ulog("Broadcasting block post validation #${n}", ("n", block_id));
+                //ilog("Broadcasting block post validation ${n} ${w} ${s}", ("n", block_id)("w", witness_account)("s", witness_signature));
                 my->node->broadcast(block_post_validation_message(block_id,witness_account,witness_signature));
+                //apply block post validation after broadcast
+                my->chain.db().apply_block_post_validation(block_id,witness_account);
             }
 
             void p2p_plugin::broadcast_transaction(const protocol::signed_transaction &tx) {

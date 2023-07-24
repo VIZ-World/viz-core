@@ -40,6 +40,7 @@
 #define CHAIN_MAX_SUPPORT_WITNESSES           10
 #define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES) /// 21 is more than enough
 #define CHAIN_HARDFORK_REQUIRED_WITNESSES     17 // 17 of the 20 dpos witnesses (19 elected and 1 virtual time) required for hardfork. This guarantees 75% participation on all subsequent rounds.
+#define CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT 20
 #define CHAIN_MAX_TIME_UNTIL_EXPIRATION       (60*60) // seconds,  aka: 1 hour
 #define CHAIN_MAX_PROXY_RECURSION_DEPTH       4
 #define CHAIN_VESTING_WITHDRAW_INTERVALS      28

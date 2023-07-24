@@ -130,6 +130,12 @@ namespace graphene {
             block_post_validation_message() {
             }
 
+            block_post_validation_message(const block_post_validation_message &bpvm):
+                block_id(bpvm.block_id),
+                witness_account(bpvm.witness_account),
+                witness_signature(bpvm.witness_signature) {
+            }
+
             block_post_validation_message(
                     const block_id_type &block_id,
                     const std::string &witness_account,
