@@ -10,6 +10,8 @@ namespace graphene { namespace chain {
     void set_paid_subscription_evaluator::do_apply(const set_paid_subscription_operation& o) {
         FC_ASSERT( _db.has_hardfork(CHAIN_HARDFORK_5), "set_paid_subscription_evaluator not enabled until HF 5" );
         const auto &account = _db.get_account(o.account);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!account.valid, "Account flagged as invalid");
 
         const auto &idx = _db.get_index<paid_subscription_index>().indices().get<by_creator>();
         auto itr = idx.find(o.account);
@@ -51,7 +53,11 @@ namespace graphene { namespace chain {
         FC_ASSERT(o.level > 0, "Paid subscibe can not be turn off manually, please wait subscribe end time or turn off auto_renewal.");
 
         const auto& subscriber = _db.get_account(o.subscriber);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!subscriber.valid, "Account flagged as invalid");
         const auto& account = _db.get_account(o.account);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!account.valid, "Account flagged as invalid");
 
         const auto &idx = _db.get_index<paid_subscription_index>().indices().get<by_creator>();
         auto itr = idx.find(o.account);

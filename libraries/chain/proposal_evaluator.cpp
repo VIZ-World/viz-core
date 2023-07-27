@@ -106,6 +106,10 @@ namespace graphene { namespace chain {
                 ("depth", CHAIN_MAX_PROPOSAL_DEPTH));
         }
 
+        const auto& check_author = _db.get_account(o.author);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!check_author.valid, "Account flagged as invalid");
+
         FC_ASSERT(nullptr == _db.find_proposal(o.author, o.title), "Proposal already exists.");
 
         const auto now = _db.head_block_time();
@@ -190,6 +194,9 @@ namespace graphene { namespace chain {
         });
 
         for (const auto& account: required_total) {
+            const auto& check_account = _db.get_account(account);
+            //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+            //    FC_ASSERT(!check_account.valid, "Account flagged as invalid");
             _db.create<required_approval_object>([&](required_approval_object& o){
                 o.account = account;
                 o.proposal = proposal.id;

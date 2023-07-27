@@ -580,6 +580,9 @@ namespace graphene {
             void p2p_plugin::broadcast_block_post_validation(const network::block_id_type block_id,
                     const std::string &witness_account,
                     const protocol::signature_type &witness_signature) {
+                if(!my->chain.db().has_hardfork(CHAIN_HARDFORK_11)){
+                    return;
+                }
                 //ilog("Broadcasting block post validation ${n} ${w} ${s}", ("n", block_id)("w", witness_account)("s", witness_signature));
                 my->node->broadcast(block_post_validation_message(block_id,witness_account,witness_signature));
                 //apply block post validation after broadcast

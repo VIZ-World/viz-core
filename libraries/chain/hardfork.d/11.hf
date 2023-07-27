@@ -1,0 +1,7 @@
+// 11 Hardfork on VIZ mainnet
+#ifndef CHAIN_HARDFORK_11
+#define CHAIN_HARDFORK_11 11
+//#define CHAIN_HARDFORK_11_TIME 1693285200 // 29 Aug 2023 05:00:00 GMT
+#define CHAIN_HARDFORK_11_TIME 1690174800 // TESTNET 24 Jul 2023 05:00:00 GMT
+#define CHAIN_HARDFORK_11_VERSION hardfork_version( version(3, 0, 0) )
+#endif

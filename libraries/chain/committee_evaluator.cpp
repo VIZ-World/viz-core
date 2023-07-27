@@ -10,6 +10,8 @@ namespace graphene { namespace chain {
         const auto &creator = _db.get_account(o.creator);
         _db.get_account(o.worker);
 
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!creator.valid, "Account flagged as invalid");
         if(_db.has_hardfork(CHAIN_HARDFORK_9)){
             FC_ASSERT(creator.balance >=
                       median_props.committee_create_request_fee, "Account does not have sufficient funds to create a committee request: required ${a}.",("a",median_props.committee_create_request_fee));
@@ -64,7 +66,9 @@ namespace graphene { namespace chain {
     }
 
     void committee_worker_cancel_request_evaluator::do_apply(const committee_worker_cancel_request_operation& o) {
-        _db.get_account(o.creator);
+        const auto &creator = _db.get_account(o.creator);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!creator.valid, "Account flagged as invalid");
         const auto &idx = _db.get_index<committee_request_index>().indices().get<by_request_id>();
         auto itr = idx.find(o.request_id);
         FC_ASSERT(itr != idx.end(), "Committee request id not found.");
@@ -84,7 +88,9 @@ namespace graphene { namespace chain {
     }
 
     void committee_vote_request_evaluator::do_apply(const committee_vote_request_operation& o) {
-        _db.get_account(o.voter);
+        const auto &voter = _db.get_account(o.voter);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!voter.valid, "Account flagged as invalid");
         const auto &idx = _db.get_index<committee_request_index>().indices().get<by_request_id>();
         auto itr = idx.find(o.request_id);
         FC_ASSERT(itr != idx.end(), "Committee request id not found.");

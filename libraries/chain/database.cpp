@@ -4034,6 +4034,9 @@ namespace graphene { namespace chain {
             _hardfork_times[CHAIN_HARDFORK_10] = fc::time_point_sec(CHAIN_HARDFORK_10_TIME);
             _hardfork_versions[CHAIN_HARDFORK_10] = CHAIN_HARDFORK_10_VERSION;
 
+            _hardfork_times[CHAIN_HARDFORK_11] = fc::time_point_sec(CHAIN_HARDFORK_11_TIME);
+            _hardfork_versions[CHAIN_HARDFORK_11] = CHAIN_HARDFORK_11_VERSION;
+
             const auto &hardforks = get_hardfork_property_object();
             FC_ASSERT(
                 hardforks.last_hardfork <= CHAIN_NUM_HARDFORKS,
@@ -4843,6 +4846,49 @@ namespace graphene { namespace chain {
                         const auto &current = *itr;
                         ++itr;
                         if(0==current.last_confirmed_block_num){
+                            //MUST be corrected: the witness_vote_object must also be deleted
+                            //remove invalid witness account from penalty index
+                            const auto &d8idx = get_index<witness_penalty_expire_index>().indices().get<by_account>();
+                            auto delete_itr8 = d8idx.lower_bound(current.owner);
+                            while(delete_itr8 != d8idx.end() &&
+                                    delete_itr8->witness == current.owner) {
+                                const auto &delete_current = *delete_itr8;
+                                ++delete_itr8;
+                                remove(delete_current);
+                            }
+                            //recalc witnesses_vote_weight from all votes to invalid witness account (remove votes to invalid witness account)
+                            const auto &vidx = get_index<witness_vote_index>().indices().get<by_witness_account>();
+                            auto vitr = vidx.lower_bound(boost::make_tuple(current.id, account_id_type()));
+                            while (vitr != vidx.end() && vitr->witness == current.id) {
+                                const auto &voter_account = get(vitr->account);
+                                const auto &vidx2 = get_index<witness_vote_index>().indices().get<by_account_witness>();
+                                auto vitr2 = vidx2.lower_bound(boost::make_tuple(voter_account.id, witness_id_type()));
+                                while (vitr2 != vidx2.end() && vitr2->account == voter_account.id) {
+                                    adjust_witness_vote(get(vitr2->witness), -voter_account.witnesses_vote_weight);
+                                    ++vitr2;
+                                }
+
+                                remove(*vitr);
+
+                                modify(voter_account, [&](account_object &a) {
+                                    a.witnesses_voted_for--;
+                                    a.valid=false;
+                                });
+
+                                share_type fair_vote_weight = voter_account.witness_vote_fair_weight();
+                                modify(voter_account, [&](account_object &a) {
+                                    a.witnesses_vote_weight = fair_vote_weight;
+                                });
+
+                                const auto &vidx3 = get_index<witness_vote_index>().indices().get<by_account_witness>();
+                                auto vitr3 = vidx3.lower_bound(boost::make_tuple(voter_account.id, witness_id_type()));
+                                while (vitr3 != vidx3.end() && vitr3->account == voter_account.id) {
+                                    adjust_witness_vote(get(vitr3->witness), voter_account.witnesses_vote_weight);
+                                    ++vitr3;
+                                }
+                                ++vitr;
+                            }
+                            elog("HF9 remove empty/spam witness ${a}", ("a", current.owner));
                             remove(current);
                         }
                     }
@@ -4883,6 +4929,23 @@ namespace graphene { namespace chain {
                 }
                 case CHAIN_HARDFORK_10:
                     break;
+                case CHAIN_HARDFORK_11:
+                {
+                    //fixed error from CHAIN_HARDFORK_9 by replay, but need toggle flag valid for spam accounts
+                    const auto &eidx = get_index<account_index>().indices().get<by_id>();
+                    auto itr = eidx.begin();
+                    while(itr != eidx.end()){
+                        const auto &current = *itr;
+                        ++itr;
+                        if(!current.valid){
+                            //toggle invalid accounts to valid
+                            modify(current, [&](account_object &a) {
+                                a.valid=true;
+                            });
+                        }
+                    }
+                    break;
+                }
                 default:
                     break;
             }
