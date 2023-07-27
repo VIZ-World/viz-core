@@ -126,6 +126,8 @@ using block_applied_callback = std::function<void(const variant &block_header)>;
 ///               API,                                    args,                return
 DEFINE_API_ARGS(get_block_header,                 msg_pack, optional<block_header>)
 DEFINE_API_ARGS(get_block,                        msg_pack, optional<signed_block>)
+DEFINE_API_ARGS(get_irreversible_block_header,    msg_pack, optional<block_header>)
+DEFINE_API_ARGS(get_irreversible_block,           msg_pack, optional<signed_block>)
 DEFINE_API_ARGS(set_block_applied_callback,       msg_pack, void_type)
 DEFINE_API_ARGS(get_config,                       msg_pack, variant_object)
 DEFINE_API_ARGS(get_dynamic_global_properties,    msg_pack, dynamic_global_property_api_object)
@@ -235,6 +237,20 @@ public:
          * @return the referenced block, or null if no matching block was found
          */
         (get_block)
+
+        /**
+         * @brief Retrieve a irreversible block header
+         * @param block_num Height of the block whose header should be returned
+         * @return header of the referenced block, or null if no matching block was found
+         */
+        (get_irreversible_block_header)
+
+        /**
+         * @brief Retrieve a full, signed irreversible block
+         * @param block_num Height of the block to be returned
+         * @return the referenced block, or null if no matching block was found
+         */
+        (get_irreversible_block)
 
         /**
          * @brief Set callback which is triggered on each generated block

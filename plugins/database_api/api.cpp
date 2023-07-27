@@ -69,6 +69,8 @@ public:
     // Blocks and transactions
     optional<block_header> get_block_header(uint32_t block_num) const;
     optional<signed_block> get_block(uint32_t block_num) const;
+    optional<block_header> get_irreversible_block_header(uint32_t block_num) const;
+    optional<signed_block> get_irreversible_block(uint32_t block_num) const;
 
     // Accounts or subaccounts on sale
     std::vector<account_on_sale_api_object> get_accounts_on_sale(uint32_t from, uint32_t limit) const;
@@ -227,6 +229,24 @@ optional<block_header> plugin::api_impl::get_block_header(uint32_t block_num) co
     return {};
 }
 
+DEFINE_API(plugin, get_irreversible_block_header) {
+    CHECK_ARG_SIZE(1)
+    return my->database().with_weak_read_lock([&]() {
+        return my->get_irreversible_block_header(args.args->at(0).as<uint32_t>());
+    });
+}
+
+optional<block_header> plugin::api_impl::get_irreversible_block_header(uint32_t block_num) const {
+    auto result = database().fetch_block_by_number(block_num);
+    if (result) {
+        const auto &dgpo = database().get_dynamic_global_properties();
+        if(block_num <= dgpo.last_irreversible_block_num){
+            return *result;
+        }
+    }
+    return {};
+}
+
 DEFINE_API(plugin, get_block) {
     CHECK_ARG_SIZE(1)
     return my->database().with_weak_read_lock([&]() {
@@ -236,6 +256,24 @@ DEFINE_API(plugin, get_block) {
 
 optional<signed_block> plugin::api_impl::get_block(uint32_t block_num) const {
     return database().fetch_block_by_number(block_num);
+}
+
+DEFINE_API(plugin, get_irreversible_block) {
+    CHECK_ARG_SIZE(1)
+    return my->database().with_weak_read_lock([&]() {
+        return my->get_irreversible_block(args.args->at(0).as<uint32_t>());
+    });
+}
+
+optional<signed_block> plugin::api_impl::get_irreversible_block(uint32_t block_num) const {
+    auto result = database().fetch_block_by_number(block_num);
+    if (result) {
+        const auto &dgpo = database().get_dynamic_global_properties();
+        if(block_num <= dgpo.last_irreversible_block_num){
+            return *result;
+        }
+    }
+    return {};
 }
 
 DEFINE_API(plugin, set_block_applied_callback) {
