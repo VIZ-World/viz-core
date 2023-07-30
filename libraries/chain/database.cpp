@@ -2340,33 +2340,18 @@ namespace graphene { namespace chain {
 
         void database::process_funds() {
             const auto &props = get_dynamic_global_properties();
-            share_type inflation_rate = int64_t( CHAIN_FIXED_INFLATION );
-            share_type new_supply = int64_t( CHAIN_INIT_SUPPLY );
-            share_type inflation_per_year = inflation_rate * int64_t( CHAIN_INIT_SUPPLY ) / int64_t( CHAIN_100_PERCENT );
-            new_supply += inflation_per_year;
-            int circles = props.head_block_number / CHAIN_BLOCKS_PER_YEAR;
-            if(circles > 0)
-            {
-               for( int itr = 0; itr < circles; ++itr )
-               {
-                  inflation_per_year = ( new_supply * inflation_rate ) / int64_t( CHAIN_100_PERCENT );
-                  new_supply += inflation_per_year;
-               }
-            }
-            share_type inflation_per_block = inflation_per_year / int64_t( CHAIN_BLOCKS_PER_YEAR );
-
-            if(has_hardfork(CHAIN_HARDFORK_4)){//consensus inflation model
-                auto witness_reward = ( inflation_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
-                auto inflation_ratio_reward = inflation_per_block - witness_reward;
-                auto committee_reward = ( inflation_ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
-                auto content_reward = inflation_ratio_reward - committee_reward;
-                inflation_per_block = witness_reward + committee_reward + content_reward;
-
+            if(has_hardfork(CHAIN_HARDFORK_11)){//new emission model (fixed amount of digital asset per block)
+                share_type digital_asset_per_block = int64_t( CHAIN_DIGITAL_ASSET_ISSUED_PER_BLOCK );
+                auto witness_reward = ( digital_asset_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
+                auto ratio_reward = digital_asset_per_block - witness_reward;
+                auto committee_part = ( ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
+                auto reward_fund_part = ratio_reward - committee_part;
+                digital_asset_per_block = witness_reward + committee_part + reward_fund_part;
                 modify( props, [&]( dynamic_global_property_object& p )
                 {
-                   p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
-                   p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
-                   p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    p.committee_fund += asset( committee_part, TOKEN_SYMBOL );
+                    p.total_reward_fund += asset( reward_fund_part, TOKEN_SYMBOL );
+                    p.current_supply += asset( digital_asset_per_block, TOKEN_SYMBOL );
                 });
 
                 const auto& cwit = get_witness( props.current_witness );
@@ -2374,32 +2359,67 @@ namespace graphene { namespace chain {
                 push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
             }
             else{
-                /*ilog( "Inflation status: props.head_block_number=${h1}, inflation_per_year=${h2}, new_supply=${h3}, inflation_per_block=${h4}",
-                   ("h1",props.head_block_number)("h2", inflation_per_year)("h3",new_supply)("h4",inflation_per_block)
-                );*/
-                auto content_reward = ( inflation_per_block * CHAIN_REWARD_FUND_PERCENT ) / CHAIN_100_PERCENT;
-                auto vesting_reward = ( inflation_per_block * CHAIN_VESTING_FUND_PERCENT ) / CHAIN_100_PERCENT; /// 15% to vesting fund
-                auto committee_reward = ( inflation_per_block * CHAIN_COMMITTEE_FUND_PERCENT ) / CHAIN_100_PERCENT;
-                auto witness_reward = inflation_per_block - content_reward - vesting_reward - committee_reward; /// Remaining 10% to witness pay
-
-                const auto& cwit = get_witness( props.current_witness );
-
-                inflation_per_block = content_reward + vesting_reward + committee_reward + witness_reward;
-                /*
-                elog( "Final inflation_per_block=${h1}, content_reward=${h2}, committee_reward=${h3}, witness_reward=${h4}, vesting_reward=${h5}",
-                   ("h1",inflation_per_block)("h2", content_reward)("h3",committee_reward)("h4",witness_reward)("h5",vesting_reward)
-                );
-                */
-                modify( props, [&]( dynamic_global_property_object& p )
+                share_type inflation_rate = int64_t( CHAIN_FIXED_INFLATION );
+                share_type new_supply = int64_t( CHAIN_INIT_SUPPLY );
+                share_type inflation_per_year = inflation_rate * int64_t( CHAIN_INIT_SUPPLY ) / int64_t( CHAIN_100_PERCENT );
+                new_supply += inflation_per_year;
+                int circles = props.head_block_number / CHAIN_BLOCKS_PER_YEAR;
+                if(circles > 0)
                 {
-                   p.total_vesting_fund += asset( vesting_reward, TOKEN_SYMBOL );
-                   p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
-                   p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
-                   p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
-                });
+                for( int itr = 0; itr < circles; ++itr )
+                {
+                    inflation_per_year = ( new_supply * inflation_rate ) / int64_t( CHAIN_100_PERCENT );
+                    new_supply += inflation_per_year;
+                }
+                }
+                share_type inflation_per_block = inflation_per_year / int64_t( CHAIN_BLOCKS_PER_YEAR );
 
-                auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
-                push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                if(has_hardfork(CHAIN_HARDFORK_4)){//consensus inflation model
+                    auto witness_reward = ( inflation_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
+                    auto inflation_ratio_reward = inflation_per_block - witness_reward;
+                    auto committee_reward = ( inflation_ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
+                    auto content_reward = inflation_ratio_reward - committee_reward;
+                    inflation_per_block = witness_reward + committee_reward + content_reward;
+
+                    modify( props, [&]( dynamic_global_property_object& p )
+                    {
+                        p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
+                        p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
+                        p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    });
+
+                    const auto& cwit = get_witness( props.current_witness );
+                    auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
+                    push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                }
+                else{
+                    /*ilog( "Inflation status: props.head_block_number=${h1}, inflation_per_year=${h2}, new_supply=${h3}, inflation_per_block=${h4}",
+                    ("h1",props.head_block_number)("h2", inflation_per_year)("h3",new_supply)("h4",inflation_per_block)
+                    );*/
+                    auto content_reward = ( inflation_per_block * CHAIN_REWARD_FUND_PERCENT ) / CHAIN_100_PERCENT;
+                    auto vesting_reward = ( inflation_per_block * CHAIN_VESTING_FUND_PERCENT ) / CHAIN_100_PERCENT; /// 15% to vesting fund
+                    auto committee_reward = ( inflation_per_block * CHAIN_COMMITTEE_FUND_PERCENT ) / CHAIN_100_PERCENT;
+                    auto witness_reward = inflation_per_block - content_reward - vesting_reward - committee_reward; /// Remaining 10% to witness pay
+
+                    const auto& cwit = get_witness( props.current_witness );
+
+                    inflation_per_block = content_reward + vesting_reward + committee_reward + witness_reward;
+                    /*
+                    elog( "Final inflation_per_block=${h1}, content_reward=${h2}, committee_reward=${h3}, witness_reward=${h4}, vesting_reward=${h5}",
+                    ("h1",inflation_per_block)("h2", content_reward)("h3",committee_reward)("h4",witness_reward)("h5",vesting_reward)
+                    );
+                    */
+                    modify( props, [&]( dynamic_global_property_object& p )
+                    {
+                        p.total_vesting_fund += asset( vesting_reward, TOKEN_SYMBOL );
+                        p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
+                        p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
+                        p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    });
+
+                    auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
+                    push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                }
             }
         }
 

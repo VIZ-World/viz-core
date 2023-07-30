@@ -62,6 +62,7 @@
 #define CHAIN_VESTING_FUND_PERCENT            (10*CHAIN_1_PERCENT) //10% of inflation
 #define CHAIN_REWARD_FUND_PERCENT             (35*CHAIN_1_PERCENT) //35% of inflation
 #define CHAIN_COMMITTEE_FUND_PERCENT          (35*CHAIN_1_PERCENT) //35% of inflation
+#define CHAIN_DIGITAL_ASSET_ISSUED_PER_BLOCK  int64_t(1000) //1.000 viz (new emission of digital asset per block)
 
 #define CHAIN_CONSENSUS_INFLATION_WITNESS_PERCENT (20*CHAIN_1_PERCENT) //20% of inflation
 #define CHAIN_CONSENSUS_INFLATION_RATIO       (50*CHAIN_1_PERCENT) //default: 50% of inflation minus witness percent (80% split between committee and reward fund)
