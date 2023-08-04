@@ -2481,6 +2481,51 @@ namespace graphene { namespace chain {
             } FC_CAPTURE_AND_RETHROW((rshares))
         }
 
+        share_type database::calc_rshare_award(share_type rshares) {
+        try {
+                FC_ASSERT(rshares > 0);
+
+                const auto &props = get_dynamic_global_properties();
+
+                u256 rs(rshares.value);
+                u256 rf(props.total_reward_fund.amount.value);
+                u256 total_rshares = to256(props.total_reward_shares);
+                total_rshares += to256(rshares.value);
+
+                u256 payout_u256 = (rf * rs) / total_rshares;
+                FC_ASSERT(payout_u256 <=
+                          u256(uint64_t(std::numeric_limits<int64_t>::max())));
+                uint64_t payout = static_cast< uint64_t >( payout_u256 );
+
+                return payout;
+            } FC_CAPTURE_AND_RETHROW((rshares))
+        }
+
+        int64_t database::calc_rshare_by_reward(const asset &reward_amount) {
+        try {
+                const auto &props = get_dynamic_global_properties();
+
+                //calc reward shares (rs) by fixed reward amount (ra)
+                u256 rs(0);//unknown reward shares
+                u256 ra(reward_amount.amount.value);//fixed reward amount
+                u256 rf(props.total_reward_fund.amount.value);//reward fund
+                u256 total_rshares = to256(props.total_reward_shares);//competition for reward fund
+
+                //ra = rf * rs / (total_rshares + rs)
+                //ra * total_rshares + ra * rs = rf * rs
+                //ra * total_rshares = rf * rs - ra * rs
+                //ra * total_rshares = rs * (rf - ra)
+                //rs = (ra * total_rshares) / (rf - ra)
+                rs = (ra * total_rshares) / (rf - ra);
+
+                //check rs not exceed int64_t
+                FC_ASSERT(rs <=
+                          u256(uint64_t(std::numeric_limits<int64_t>::max())));
+
+                return static_cast< int64_t >( rs );
+            } FC_CAPTURE_AND_RETHROW()
+        }
+
         void database::expire_award_shares_processing() {
             const auto &props = get_dynamic_global_properties();
             const auto &idx = get_index<award_shares_expire_index>().indices().get<by_expiration>();
@@ -3267,8 +3312,9 @@ namespace graphene { namespace chain {
                 committee_processing();
                 paid_subscribe_processing();
                 process_hardforks();
-                create_block_post_validation(next_block_num,next_block_id,next_block.witness);
+
                 check_block_post_validation_chain();
+                create_block_post_validation(next_block_num,next_block_id,next_block.witness);
 
                 // notify observers that the block has been applied
                 notify_applied_block(next_block);
@@ -3549,25 +3595,26 @@ namespace graphene { namespace chain {
         //after block is applied check block post validation chain step by step
         //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
         void database::check_block_post_validation_chain(){
-            const dynamic_global_property_object &dpo = get_dynamic_global_properties();
-            const witness_schedule_object &wso = get_witness_schedule_object();
-
-            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
-            if(!validation_list.empty()){
-                auto itr = validation_list.begin();
-                while(itr != validation_list.end())
-                {
-                    bool remove_validated = false;
-                    const auto& current = *itr;
-                    if((1 + dpo.last_irreversible_block_num) == current.block_num){
-                        int count=0;
-                        for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
-                            if(current.current_shuffled_witnesses[j] == account_name_type()){//already validated
-                                count++;
+            try {
+                const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+                if(!validation_list.empty()){
+                    const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+                    const witness_schedule_object &wso = get_witness_schedule_object();
+                    //ilog("! check_block_post_validation_chain = ${n}", ("n", validation_list.size()));
+                    auto itr = validation_list.begin();
+                    while(itr != validation_list.end())
+                    {
+                        bool remove_validated = false;
+                        const auto& current = *itr;
+                        itr++;
+                        if((1 + dpo.last_irreversible_block_num) == current.block_num){
+                            size_t count=0;
+                            for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                                if(current.current_shuffled_witnesses_validations[j] == true){//already validated
+                                    count++;
+                                }
                             }
-                        }
-                        if(count >= (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
-                            try {
+                            if(count >= (size_t(wso.num_scheduled_witnesses) * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
                                 modify(dpo, [&](dynamic_global_property_object &_dpo) {
                                     _dpo.last_irreversible_block_num = current.block_num;
                                     _dpo.last_irreversible_block_id = block_id_type();
@@ -3576,7 +3623,6 @@ namespace graphene { namespace chain {
                                 });
 
                                 commit(dpo.last_irreversible_block_num);
-                                //ilog("!!! NEW irreversible block: ${num} ${id}", ("num", current.block_num)("id", current.block_id));
 
                                 // output to block log based on new last irreverisible block num
                                 const auto &tmp_head = _block_log.head();
@@ -3614,62 +3660,56 @@ namespace graphene { namespace chain {
                                 _fork_db.set_max_size(dpo.head_block_number -
                                                     dpo.last_irreversible_block_num + 1);
                                 remove_validated=true;
-                            } FC_CAPTURE_AND_RETHROW()
+                            }
+                        }
+                        if(remove_validated){
+                            remove(current);
                         }
                     }
-                    itr++;
-                    if(remove_validated){
-                        remove(current);
-                    }
                 }
-            }
+            } FC_CAPTURE_AND_RETHROW()
         }
 
         //p2p plugin check witness signature on handle_message
         //and apply block post validation for block id by witness account
         //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
         void database::apply_block_post_validation(block_id_type block_id, const account_name_type &witness_account){
-            //ilog("apply_block_post_validation block_id:${block_id} witness_account:${witness_account}", ("block_id", block_id)("witness_account", witness_account));
-            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
-            if(!validation_list.empty()){
-                auto itr = validation_list.begin();
-                bool find = false;
-                uint32_t find_block_num = 0;
-                auto find_obj = *itr;
-                int count = 0;
-                while(itr != validation_list.end())
-                {
-                    const auto& current = *itr;
-                    if(current.block_id == block_id){
-                        find_block_num = current.block_num;
-                        modify(current, [&](block_post_validation_object &o) {
-                            //remove witness from shuffled witnesses
-                            for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
-                                if(o.current_shuffled_witnesses[j] == witness_account){
-                                    o.current_shuffled_witnesses[j] = account_name_type();//empty
-                                    find = true;
-                                    find_obj=*itr;
+            try {
+                const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+                if(!validation_list.empty()){
+                    auto itr = validation_list.begin();
+                    bool find = false;
+                    uint32_t find_block_num = 0;
+                    auto find_obj = *itr;
+                    size_t count = 0;
+                    while(itr != validation_list.end())
+                    {
+                        const auto& current = *itr;
+                        if(current.block_id == block_id){
+                            find_block_num = current.block_num;
+                            modify(current, [&](block_post_validation_object &o) {
+                                //remove witness from shuffled witnesses
+                                for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                                    if(o.current_shuffled_witnesses[j] == witness_account){
+                                        o.current_shuffled_witnesses_validations[j] = true;
+                                        //need update
+                                        find = true;
+                                        find_obj=*itr;
+                                    }
+                                    if(o.current_shuffled_witnesses_validations[j] == true){//already validated
+                                        count++;
+                                    }
                                 }
-                                if(o.current_shuffled_witnesses[j] == account_name_type()){//already validated
-                                    count++;
-                                }
-                            }
-                        });
-                        break;
+                            });
+                            break;
+                        }
+                        ++itr;
                     }
-                    ++itr;
-                }
-                if(find){
-                    //ilog("! Validations count  ${count}", ("count", count));
-                    const dynamic_global_property_object &dpo = get_dynamic_global_properties();
-                    //ilog("last_irreversible_block_num  ${num}", ("num", (1 + dpo.last_irreversible_block_num)));
-                    //ilog("find_block_num  ${num}", ("num", (find_block_num)));
-                    if((1 + dpo.last_irreversible_block_num) == find_block_num){
-                        //ilog("! block num ${num} is step behind of irreversible", ("num", find_block_num));
-                        const witness_schedule_object &wso = get_witness_schedule_object();
-                        if(count >= (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
-                            //ilog("! count is more than ${calc}", ("calc", (wso.num_scheduled_witnesses * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)));
-                            try {
+                    if(find){
+                        const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+                        if((1 + dpo.last_irreversible_block_num) == find_block_num){
+                            const witness_schedule_object &wso = get_witness_schedule_object();
+                            if(count >= (size_t(wso.num_scheduled_witnesses) * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
                                 modify(dpo, [&](dynamic_global_property_object &_dpo) {
                                     _dpo.last_irreversible_block_num = find_block_num;
                                     _dpo.last_irreversible_block_id = block_id_type();
@@ -3678,7 +3718,6 @@ namespace graphene { namespace chain {
                                 });
 
                                 commit(dpo.last_irreversible_block_num);
-                                //ilog("!!! NEW irreversible block: ${num} ${id}", ("num", find_block_num)("id", block_id));
 
                                 // output to block log based on new last irreverisible block num
                                 const auto &tmp_head = _block_log.head();
@@ -3715,12 +3754,11 @@ namespace graphene { namespace chain {
 
                                 _fork_db.set_max_size(dpo.head_block_number -
                                                     dpo.last_irreversible_block_num + 1);
-                            } FC_CAPTURE_AND_RETHROW()
+                            }
                         }
                     }
                 }
-            }
-            return;
+            } FC_CAPTURE_AND_RETHROW()
         }
 
         //get block post validation objects for witness
@@ -3729,30 +3767,20 @@ namespace graphene { namespace chain {
             std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> result;
             const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
             auto itr = validation_list.begin();
-            int i = 0;
+            size_t i = 0;
             while(itr != validation_list.end())
             {
                 const auto& current = *itr;
                 ++itr;
                 //if witness is in the list add it to result
-                for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
                     if(current.current_shuffled_witnesses[j] == witness_account){
-                        result[i] = block_post_validation_object(current);
-                        //ilog("find bplo: ${block_num}, ${block_id}, witnesses ${current_shuffled_witnesses}", ("block_num", result[i].block_num)("block_id", result[i].block_id)("current_shuffled_witnesses", result[i].current_shuffled_witnesses));
-                        ++i;
-                    }
-                }
-                /*
-                //old code, new remove witness from shuffled witnesses in apply_block_post_validation
-                modify(current, [&](block_post_validation_object &o) {
-                    //remove witness from shuffled witnesses
-                    for (int j = 0; j< CHAIN_MAX_WITNESSES; j++) {
-                        if(o.current_shuffled_witnesses[j] == witness_account){
-                            o.current_shuffled_witnesses[j] = account_name_type();
+                        if(current.current_shuffled_witnesses_validations[j] == false){//need validate
+                            result[i] = block_post_validation_object(current);
+                            ++i;
                         }
                     }
-                });
-                */
+                }
             }
             //fill result with empty objects to return array with fixed size
             for(; i < CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT; i++){
@@ -3765,8 +3793,8 @@ namespace graphene { namespace chain {
         //remove old block post validation objects
         //remove old blocks from post validation list if it is full (CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT)
         void database::create_block_post_validation(uint32_t block_num, block_id_type block_id, const account_name_type& witness_account){
-            //remove blocks if they height is less than last irreversible block
             const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+            //remove blocks if they height is less than last irreversible block
             const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
             auto itr1 = validation_list.begin();
             while(itr1 != validation_list.end())
@@ -3778,39 +3806,37 @@ namespace graphene { namespace chain {
                 }
             }
             //remove old blocks from post validation list if it is full
-            int max_block_post_validation_size = 0;
-            for (auto itr = validation_list.begin();
-                    itr != validation_list.end();
+            const auto& validation_list2 = get_index<block_post_validation_index>().indices().get<by_id>();
+            size_t max_block_post_validation_size = 0;
+            auto first=validation_list2.begin();
+            for (auto itr = validation_list2.begin();
+                    itr != validation_list2.end();
                     ++itr) {
                 max_block_post_validation_size++;
-                /*
-                ilog(
-                    "block post validation #{n}: block ${block_num}, ${block_id}, witnesses are: ${w}",
-                    ("n", max_block_post_validation_size)("block_num", itr->block_num)("block_id", itr->block_id)("w", itr->current_shuffled_witnesses));
-                */
                 if(max_block_post_validation_size >= CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT) {
-                    const auto& first_item = *validation_list.begin();
+                    const auto& first_item = *first;
+                    first++;
                     remove(first_item);//remove first element, oldest block
                 }
             }
             //create new block in post validation list
             create<block_post_validation_object>([&](block_post_validation_object& o) {
-                //ilog("create_block_post_validation: block ${block_num}, ${block_id}, witness ${witness_account}", ("block_num", block_num)("block_id", block_id)("witness_account", witness_account));
                 o.block_num = block_num;
                 o.block_id = block_id_type(block_id);
-                for (int i = 0; i < CHAIN_MAX_WITNESSES; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
-                    o.current_shuffled_witnesses[i] = account_name_type();
-                }
                 const witness_schedule_object &wso = get_witness_schedule_object();
-                int witness_index=0;
-                for (int i = 0; i < wso.num_scheduled_witnesses; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                size_t witness_index=0;
+                size_t i = 0;
+                for (; i < wso.num_scheduled_witnesses; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
                     if(witness_account != wso.current_shuffled_witnesses[i]){
                         o.current_shuffled_witnesses[witness_index] = account_name_type(wso.current_shuffled_witnesses[i]);
+                        o.current_shuffled_witnesses_validations[witness_index] = false;
                         witness_index++;
-                        //ilog("success add ${i} witness", ("i", wso.current_shuffled_witnesses[i]));
                     }
                 }
-
+                for (; i < CHAIN_MAX_WITNESSES; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                    o.current_shuffled_witnesses[i] = account_name_type();
+                    o.current_shuffled_witnesses_validations[i] = false;
+                }
             });
         }
 
