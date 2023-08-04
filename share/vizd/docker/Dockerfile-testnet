@@ -62,7 +62,7 @@ RUN set -xe ;\
 RUN \
     apt-get clean && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/* && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
 
 FROM phusion/baseimage:bionic-1.0.0 as production
 COPY --from=builder /usr/local /usr/local
