@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.19 as builder
+FROM phusion/baseimage:bionic-1.0.0 as builder
 
 ENV LANG=en_US.UTF-8
 ENV APPDIR /usr/local/src/viz/
@@ -10,12 +10,13 @@ RUN \
         autoconf \
         automake \
         autotools-dev \
+        binutils \
         bsdmainutils \
         build-essential \
         cmake \
         doxygen \
         git \
-        ccache\
+        ccache \
         libboost-all-dev \
         libreadline-dev \
         libssl-dev \
@@ -58,7 +59,58 @@ RUN set -xe ;\
     make install ;\
     rm -rf $APPDIR
 
-FROM phusion/baseimage:0.9.19
+RUN \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+
+RUN \
+    apt-get remove -y \
+        automake \
+        autotools-dev \
+        bsdmainutils \
+        build-essential \
+        cmake \
+        doxygen \
+        dpkg-dev \
+        libboost-all-dev \
+        libc6-dev \
+        libexpat1-dev \
+        libgcc-7-dev \
+        libhwloc-dev \
+        libibverbs-dev \
+        libicu-dev \
+        libltdl-dev \
+        libncurses5-dev \
+        libnuma-dev \
+        libopenmpi-dev \
+        libpython-dev \
+        libpython2.7-dev \
+        libreadline-dev \
+        libreadline6-dev \
+        libssl-dev \
+        libstdc++-7-dev \
+        libtinfo-dev \
+        libtool \
+        linux-libc-dev \
+        m4 \
+        make \
+        manpages \
+        manpages-dev \
+        mpi-default-dev \
+        python-dev \
+        python2.7-dev \
+        python3-dev \
+    && \
+    apt-get autoremove -y && \
+    rm -rf \
+        /var/lib/apt/lists/* \
+        /tmp/* \
+        /var/tmp/* \
+        /var/cache/* \
+        /usr/include \
+        /usr/local/include
+
+FROM phusion/baseimage:bionic-1.0.0 as production
 COPY --from=builder /usr/local /usr/local
 
 RUN set -xe ;\
