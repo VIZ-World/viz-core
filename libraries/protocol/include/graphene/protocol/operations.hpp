@@ -11,8 +11,8 @@ namespace graphene { namespace protocol {
          * or it will trigger a hardfork.
          */
         typedef fc::static_variant<
-                vote_operation,
-                content_operation,
+                vote_operation,//deprecated
+                content_operation,//deprecated
 
                 transfer_operation,
                 transfer_to_vesting_operation,
@@ -24,7 +24,7 @@ namespace graphene { namespace protocol {
                 account_witness_vote_operation,
                 account_witness_proxy_operation,
 
-                delete_content_operation,
+                delete_content_operation,//deprecated
                 custom_operation,
                 set_withdraw_vesting_route_operation,
                 request_account_recovery_operation,
@@ -72,6 +72,7 @@ namespace graphene { namespace protocol {
 
                 versioned_chain_properties_update_operation,
                 award_operation,
+                // virtual operations:
                 receive_award_operation,
                 benefactor_award_operation,
 
@@ -90,7 +91,14 @@ namespace graphene { namespace protocol {
                 account_sale_operation,
 
                 use_invite_balance_operation,
-                expire_escrow_ratification_operation
+                expire_escrow_ratification_operation,
+
+                // VIZ HF 11:
+                fixed_award_operation,
+                target_account_sale_operation,
+                // virtual operations:
+                bid_operation,
+                outbid_operation
         > operation;
 
         /*void operation_get_required_authorities( const operation& op,

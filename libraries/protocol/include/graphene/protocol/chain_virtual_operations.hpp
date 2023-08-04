@@ -278,6 +278,30 @@ namespace graphene { namespace protocol {
 
             time_point_sec ratification_deadline;
         };
+
+        struct bid_operation : public virtual_operation {
+            bid_operation() {
+            }
+
+            bid_operation(const account_name_type& a, const account_name_type& b, const asset& p)
+                    : account(a), bidder(b), bid(p) {
+            }
+            account_name_type account;
+            account_name_type bidder;
+            asset bid;
+        };
+
+        struct outbid_operation : public virtual_operation {
+            outbid_operation() {
+            }
+
+            outbid_operation(const account_name_type& a, const account_name_type& b, const asset& p)
+                    : account(a), bidder(b), bid(p) {
+            }
+            account_name_type account;
+            account_name_type bidder;
+            asset bid;
+        };
 } } //graphene::protocol
 
 FC_REFLECT((graphene::protocol::author_reward_operation), (author)(permlink)(token_payout)(vesting_payout))
@@ -300,3 +324,5 @@ FC_REFLECT((graphene::protocol::paid_subscription_action_operation), (subscriber
 FC_REFLECT((graphene::protocol::cancel_paid_subscription_operation), (subscriber)(account))
 FC_REFLECT((graphene::protocol::account_sale_operation), (account)(price)(buyer)(seller))
 FC_REFLECT((graphene::protocol::expire_escrow_ratification_operation), (from)(to)(agent)(escrow_id)(token_amount)(fee)(ratification_deadline))
+FC_REFLECT((graphene::protocol::bid_operation), (account)(bidder)(bid))
+FC_REFLECT((graphene::protocol::outbid_operation), (account)(bidder)(bid))

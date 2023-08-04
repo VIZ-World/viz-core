@@ -385,8 +385,13 @@ namespace graphene { namespace chain {
 
             void expire_escrow_ratification();
 
+            void account_on_auction_expiration();
+
             share_type claim_rshare_reward(share_type rshares);
             share_type claim_rshare_award(share_type rshares);
+
+            share_type calc_rshare_award(share_type rshares);
+            int64_t calc_rshare_by_reward(const asset &reward_amount);
 
             time_point_sec head_block_time() const;
 

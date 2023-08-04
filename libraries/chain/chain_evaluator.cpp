@@ -7,6 +7,13 @@
 namespace graphene { namespace chain {
         using fc::uint128_t;
 
+        inline u256 to256(const fc::uint128_t &t) {
+            u256 v(t.hi);
+            v <<= 64;
+            v += t.lo;
+            return v;
+        }
+
         inline void validate_permlink(const string &permlink) {
             FC_ASSERT(permlink.size() < CHAIN_MAX_URL_LENGTH, "permlink is too long");
             FC_ASSERT(fc::is_utf8(permlink), "permlink not formatted in UTF8");
@@ -320,7 +327,7 @@ namespace graphene { namespace chain {
 
                 int64_t used_energy = o.energy;
                 FC_ASSERT(used_energy <=
-                          current_energy,"Account does not have enough energy to vote. Current energy: ${e}, used energy: ${u}",("e",current_energy)("u",used_energy));
+                          current_energy,"Account does not have enough energy to award. Current energy: ${e}, used energy: ${u}",("e",current_energy)("u",used_energy));
 
                 int64_t rshares = (
                     (uint128_t(initiator.effective_vesting_shares().amount.value) * used_energy) /
@@ -383,6 +390,159 @@ namespace graphene { namespace chain {
                         _db.push_virtual_operation(
                             receive_award_operation(o.initiator,o.receiver,o.custom_sequence,o.memo,shares_created));
                     }
+                }
+            } FC_CAPTURE_AND_RETHROW((o))
+        }
+
+        void fixed_award_evaluator::do_apply(const fixed_award_operation &o) {
+            FC_ASSERT( _db.has_hardfork(CHAIN_HARDFORK_11), "fixed_award_evaluator not enabled until HF 11" );
+            try {
+                database &_db = db();
+                const dynamic_global_property_object &dgpo = _db.get_dynamic_global_properties();
+                const auto& median_props = _db.get_witness_schedule_object().median_props;
+                const auto &initiator = _db.get_account(o.initiator);
+                //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+                //    FC_ASSERT(!initiator.valid, "Account flagged as invalid");
+                const auto &receiver = _db.get_account(o.receiver);
+                //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+                //    FC_ASSERT(!receiver.valid, "Account flagged as invalid");
+
+                int64_t elapsed_seconds = (_db.head_block_time() -
+                                           initiator.last_vote_time).to_seconds();
+
+                int64_t regenerated_energy =
+                        (CHAIN_100_PERCENT * elapsed_seconds) /
+                        CHAIN_ENERGY_REGENERATION_SECONDS;
+                int64_t current_energy = std::min(int64_t(initiator.energy +
+                                                         regenerated_energy), int64_t(CHAIN_100_PERCENT));
+                FC_ASSERT(current_energy >
+                          0, "Account currently does not have voting energy. Current energy: ${e}",("e",current_energy));
+
+                //need to calc energy amount and rshares for it
+
+                int64_t max_energy = o.max_energy;
+                FC_ASSERT(max_energy <=
+                          current_energy,"Account does not have enough energy to award. Current energy: ${e}, max energy: ${u}",("e",current_energy)("u",max_energy));
+
+                int64_t max_rshares = (
+                    (uint128_t(initiator.effective_vesting_shares().amount.value) * max_energy) /
+                    (CHAIN_100_PERCENT)).to_uint64();
+
+                uint128_t max_reward = uint128_t(_db.calc_rshare_award(max_rshares));
+                FC_ASSERT(max_reward >=
+                          o.reward_amount.amount.value,"Max available reward: ${r}, requested reward amount: ${u}",("r",max_reward)("u",o.reward_amount.amount.value));
+                //int64_t rs = _db.calc_rshare_by_reward(o.reward_amount);
+                //calc_rshare_by_reward
+                //calc reward shares (rs) by fixed reward amount (ra)
+                u256 rs_calc(0);//unknown reward shares
+                u256 ra(o.reward_amount.amount.value);//fixed reward amount
+                u256 rf(dgpo.total_reward_fund.amount.value);//reward fund
+                u256 total_rshares = to256(dgpo.total_reward_shares);//competition for reward fund
+
+                //ra = rf * rs / (total_rshares + rs)
+                //ra * total_rshares + ra * rs = rf * rs
+                //ra * total_rshares = rf * rs - ra * rs
+                //ra * total_rshares = rs * (rf - ra)
+                //rs = (ra * total_rshares) / (rf - ra)
+                rs_calc = u256(ra * total_rshares) / u256(rf - ra);
+                //ilog("Calculated (ra * total_rshares): ${r}",("r",uint64_t(ra * total_rshares)));
+                //ilog("Calculated (rf - ra): ${r}",("r",uint64_t(rf - ra)));
+                //ilog("Calculated rs_calc: ${r}",("r",uint64_t(rs_calc)));
+
+                //check rs not exceed int64_t
+                FC_ASSERT(rs_calc <=
+                          u256(uint64_t(std::numeric_limits<int64_t>::max())));
+
+                int64_t rs = static_cast< int64_t >( rs_calc );
+
+
+                FC_ASSERT(rs <=
+                          max_rshares,"Account does not have enough potential to fixed award. Current rs: ${rs}, max rs: ${mrs}",("rs",rs)("mrs",max_rshares));
+
+                int64_t need_energy = ( (uint128_t(rs) * max_energy ) / max_rshares ).to_uint64();
+
+                need_energy++;//increase 0.01% for calculations overlap
+                //to not exceed 100.00%
+                need_energy=std::min(need_energy, int64_t(CHAIN_100_PERCENT));
+
+                int64_t rshares = (
+                    (uint128_t(initiator.effective_vesting_shares().amount.value) * need_energy) /
+                    (CHAIN_100_PERCENT)).to_uint64();
+
+                // Consensus by median props - vote accounting affects only with rshares greater than vote_accounting_min_rshares
+                asset tokens=asset(0,SHARES_SYMBOL);
+                uint128_t reward_tokens = 0;
+                if(rshares < int64_t(median_props.vote_accounting_min_rshares)){
+                    rshares=0;
+                }
+                else{
+                    reward_tokens = uint128_t(_db.calc_rshare_award(rshares));
+                    tokens=asset(reward_tokens.to_uint64(),TOKEN_SYMBOL);
+                }
+
+                FC_ASSERT(tokens.amount >=
+                          o.reward_amount.amount,"Calculated reward is lesser than fixed reward amount. Calculated reward: ${cr}, fixed reward amount: ${fra}",("cr",tokens)("fra",o.reward_amount));
+
+                //claim_rshare_award only after FC_ASSERT checks
+                if(0 != rshares){
+                    reward_tokens = uint128_t(_db.claim_rshare_award(rshares));
+                    tokens=asset(reward_tokens.to_uint64(),TOKEN_SYMBOL);
+                }
+                else{
+                    FC_ASSERT(false, "Potential rshares is 0");
+                }
+
+                if(tokens.amount>0){
+                    _db.modify(initiator, [&](account_object &a) {
+                        a.energy = current_energy - need_energy;
+                        a.last_vote_time = _db.head_block_time();
+                        a.vote_count++;
+                    });
+                    if (_db.is_producing()) {
+                        FC_ASSERT(o.beneficiaries.size() <= CHAIN_MAX_COMMENT_BENEFICIARIES,
+                                  "Cannot specify more than ${m} beneficiaries.", ("m", CHAIN_MAX_COMMENT_BENEFICIARIES));
+                    }
+                    share_type receiver_tokens = tokens.amount;
+                    share_type donation_tokens = receiver_tokens - o.reward_amount.amount;
+                    receiver_tokens -= donation_tokens;
+                    share_type total_beneficiary = 0;
+                    for (auto &b : o.beneficiaries) {
+                        auto acc = _db.find< account_object, by_name >( b.account );
+                        FC_ASSERT( acc != nullptr, "Beneficiary \"${a}\" must exist.", ("a", b.account) );
+
+                        const auto &b_account = _db.get_account(b.account);
+                        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+                        //    FC_ASSERT(!b_account.valid, "Account flagged as invalid");
+
+                        //pay benefactor
+                        auto benefactor_tokens = (tokens.amount * b.weight) / CHAIN_100_PERCENT;
+                        auto shares_created = _db.create_vesting(_db.get_account(b.account), benefactor_tokens);
+                        _db.modify(_db.get_account(b.account), [&](account_object &a) {
+                            a.benefactor_awards += benefactor_tokens;
+                        });
+                        _db.push_virtual_operation(
+                            benefactor_award_operation(o.initiator,b.account,o.receiver,o.custom_sequence,o.memo,shares_created));
+                        total_beneficiary += benefactor_tokens;
+                    }
+
+                    receiver_tokens -= total_beneficiary;
+                    if(receiver_tokens>0){
+                        auto shares_created = _db.create_vesting(receiver, receiver_tokens);
+                        _db.modify(receiver, [&](account_object &a) {
+                            a.receiver_awards += receiver_tokens;
+                        });
+                        _db.push_virtual_operation(
+                            receive_award_operation(o.initiator,o.receiver,o.custom_sequence,o.memo,shares_created));
+                    }
+
+                    if(donation_tokens>0){//exceed reward going to committee fund
+                        _db.modify(dgpo, [&](dynamic_global_property_object& dgpo) {
+                            dgpo.committee_fund.amount += donation_tokens;
+                        });
+                    }
+                }
+                else{
+                    FC_ASSERT(false, "Potential reward is 0");
                 }
             } FC_CAPTURE_AND_RETHROW((o))
         }
@@ -1624,32 +1784,273 @@ namespace graphene { namespace chain {
             const auto& account_seller = _db.get_account(op.account_seller);
             //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
             //    FC_ASSERT(!account_seller.valid, "Account flagged as invalid");
-            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
-                if(""==account.account_seller){
+            if(_db.has_hardfork(CHAIN_HARDFORK_11)){//new auction mechanics while account have time to sale start
+                if(""==account.account_seller){//pay fee if seller is empty
                     const auto& median_props = _db.get_witness_schedule_object().median_props;
                     const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
 
                     FC_ASSERT(account.balance >=
-                              median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
+                            median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
 
                     _db.adjust_balance(account, -median_props.account_on_sale_fee);
                     _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
                         dgp.committee_fund += median_props.account_on_sale_fee;
                     });
                 }
-            }
-            _db.modify(account, [&](account_object& a) {
-                a.account_seller = op.account_seller;
-                a.account_offer_price = op.account_offer_price;
-                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
-                    if(false==a.account_on_sale){
+                _db.modify(account, [&](account_object& a) {
+                    a.account_seller = op.account_seller;//change seller account
+
+                    //check on sale status and reset bid if needed
+                    if(false==op.account_on_sale){//disable sale
+                        if(true==a.account_on_auction){//have bid
+                            if(account.current_bidder != ""){
+                                const auto& account_bidder = _db.get_account(account.current_bidder);
+                                //return bid from reserved balance
+                                _db.modify(account_bidder, [&](account_object &ab) {
+                                    ab.reserved_balance -= account.current_bid;
+                                    ab.balance += account.current_bid;
+                                });
+
+                                _db.push_virtual_operation(
+                                    outbid_operation(account.name,account_bidder.name,account.current_bid));
+                            }
+                        }
+
+                        //clear params
+                        //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                        //account.account_seller = "";
+                        a.account_on_sale=false;
+                        a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                        a.account_on_sale_start_time = fc::time_point_sec::min();
+
+                        a.account_on_auction=false;
+                        a.current_bid = asset(0, TOKEN_SYMBOL);
+                        a.current_bidder = "";
+                        a.current_bidder_key = public_key_type();
+                        a.last_bid = asset(0, TOKEN_SYMBOL);
+                    }
+                    else{//enable sale
+                        if(a.account_offer_price < op.account_offer_price){//new price is greater
+                            if(account.current_bidder != ""){//have bid
+                                if(account.current_bid.amount >= op.account_offer_price.amount){
+                                    //all is good, bid is enough for the new price
+                                }
+                                else{
+                                    //reset bid
+                                    const auto& account_bidder = _db.get_account(account.current_bidder);
+                                    //return bid from reserved balance
+                                    _db.modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    _db.push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    //clear auction params
+                                    a.account_on_auction=false;
+                                    a.current_bid = asset(0, TOKEN_SYMBOL);
+                                    a.current_bidder = "";
+                                    a.current_bidder_key = public_key_type();
+                                    a.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                        }
+
+                    }
+
+                    a.account_offer_price = op.account_offer_price;
+
+                    if(false==a.account_on_sale){//was not on sale
                         if(true==op.account_on_sale){
                             a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
                         }
                     }
-                    if(false==op.account_on_sale){
-                        a.account_on_sale_start_time = fc::time_point_sec::min();
+                    a.account_on_sale = op.account_on_sale;
+                });
+            }
+            else{//old behaviour
+                if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    if(""==account.account_seller){
+                        const auto& median_props = _db.get_witness_schedule_object().median_props;
+                        const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                        FC_ASSERT(account.balance >=
+                                median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
+
+                        _db.adjust_balance(account, -median_props.account_on_sale_fee);
+                        _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                            dgp.committee_fund += median_props.account_on_sale_fee;
+                        });
                     }
+                }
+                _db.modify(account, [&](account_object& a) {
+                    a.account_seller = op.account_seller;
+                    a.account_offer_price = op.account_offer_price;
+                    if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                        if(false==a.account_on_sale){
+                            if(true==op.account_on_sale){
+                                a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
+                            }
+                        }
+                        if(false==op.account_on_sale){
+                            a.account_on_sale_start_time = fc::time_point_sec::min();
+                        }
+                    }
+                    a.account_on_sale = op.account_on_sale;
+                });
+            }
+        }
+
+        void target_account_sale_evaluator::do_apply(const target_account_sale_operation& op) {
+            const auto& account = _db.get_account(op.account);
+            const auto& account_seller = _db.get_account(op.account_seller);
+            const auto& target_buyer = _db.get_account(op.target_buyer);
+
+            if(""==account.account_seller){//pay fee if seller is empty
+                const auto& median_props = _db.get_witness_schedule_object().median_props;
+                const dynamic_global_property_object &dgp = _db.get_dynamic_global_properties();
+
+                FC_ASSERT(account.balance >=
+                        median_props.account_on_sale_fee, "Account does not have sufficient funds to place account for sale: required ${a}.",("a",median_props.account_on_sale_fee));
+
+                _db.adjust_balance(account, -median_props.account_on_sale_fee);
+                _db.modify(dgp, [&](dynamic_global_property_object &dgp) {
+                    dgp.committee_fund += median_props.account_on_sale_fee;
+                });
+            }
+            _db.modify(account, [&](account_object& a) {
+                a.account_seller = op.account_seller;//change seller account
+
+                //check on sale status and reset bid if needed
+                if(false==op.account_on_sale){//disable sale
+                    if(true==a.account_on_auction){//have bid
+                        if(account.current_bidder != ""){
+                            const auto& account_bidder = _db.get_account(account.current_bidder);
+                            //return bid from reserved balance
+                            _db.modify(account_bidder, [&](account_object &ab) {
+                                ab.reserved_balance -= account.current_bid;
+                                ab.balance += account.current_bid;
+                            });
+
+                            _db.push_virtual_operation(
+                                outbid_operation(account.name,account_bidder.name,account.current_bid));
+                        }
+                    }
+
+                    //clear params
+                    //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                    //account.account_seller = "";
+                    a.account_on_sale=false;
+                    a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                    a.account_on_sale_start_time = fc::time_point_sec::min();
+                    a.target_buyer = "";//clear target buyer if sale disabled
+
+                    a.account_on_auction=false;
+                    a.current_bid = asset(0, TOKEN_SYMBOL);
+                    a.current_bidder = "";
+                    a.current_bidder_key = public_key_type();
+                    a.last_bid = asset(0, TOKEN_SYMBOL);
+                }
+                else{//enable sale
+                    if(a.account_offer_price < op.account_offer_price){//new price is greater
+                        if(account.current_bidder != ""){//have bid
+                            if(account.current_bid.amount >= op.account_offer_price.amount){
+                                //all is good, bid is enough for the new price
+                                //but need check target_buyer
+                                if(account.current_bidder != op.target_buyer){
+                                    //reset bid
+                                    const auto& account_bidder = _db.get_account(account.current_bidder);
+                                    //return bid from reserved balance
+                                    _db.modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    _db.push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    //clear auction params
+                                    a.account_on_auction=false;
+                                    a.current_bid = asset(0, TOKEN_SYMBOL);
+                                    a.current_bidder = "";
+                                    a.current_bidder_key = public_key_type();
+                                    a.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                            else{
+                                //reset bid if new price is bigger than current bid
+                                const auto& account_bidder = _db.get_account(account.current_bidder);
+                                //return bid from reserved balance
+                                _db.modify(account_bidder, [&](account_object &ab) {
+                                    ab.reserved_balance -= account.current_bid;
+                                    ab.balance += account.current_bid;
+                                });
+
+                                _db.push_virtual_operation(
+                                    outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                //clear auction params
+                                a.account_on_auction=false;
+                                a.current_bid = asset(0, TOKEN_SYMBOL);
+                                a.current_bidder = "";
+                                a.current_bidder_key = public_key_type();
+                                a.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                        }
+                        //no current bid, nothing to do
+                    }
+                    else{//new price is lesser
+                        //need check bidder
+                        if(account.current_bidder != ""){//have bid
+                            if(account.current_bidder != op.target_buyer){
+                                //reset bid for not target buyer
+                                const auto& account_bidder = _db.get_account(account.current_bidder);
+                                //return bid from reserved balance
+                                _db.modify(account_bidder, [&](account_object &ab) {
+                                    ab.reserved_balance -= account.current_bid;
+                                    ab.balance += account.current_bid;
+                                });
+
+                                _db.push_virtual_operation(
+                                    outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                //clear auction params
+                                a.account_on_auction=false;
+                                a.current_bid = asset(0, TOKEN_SYMBOL);
+                                a.current_bidder = "";
+                                a.current_bidder_key = public_key_type();
+                                a.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                        }
+                    }
+
+                    a.account_offer_price = op.account_offer_price;
+
+                    if(false==a.account_on_sale){//was not on sale
+                        if(true==op.account_on_sale){
+                            a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
+                        }
+                    }
+                    a.account_on_sale=true;
+                    a.target_buyer=op.target_buyer;
+                }
+            });
+
+
+            _db.modify(account, [&](account_object& a) {
+                a.account_offer_price = op.account_offer_price;
+                if(false==a.account_on_sale){
+                    if(true==op.account_on_sale){
+                        a.account_on_sale_start_time = _db.head_block_time() + CHAIN_ACCOUNT_ON_SALE_DELAY;
+                    }
+                }
+                if(false==op.account_on_sale){
+                    a.target_buyer = "";//clear target buyer if sale disabled
+                    a.account_on_sale_start_time = fc::time_point_sec::min();
+                }
+                else{
+                    a.target_buyer = op.target_buyer;
                 }
                 a.account_on_sale = op.account_on_sale;
             });
@@ -1705,59 +2106,175 @@ namespace graphene { namespace chain {
                     FC_ASSERT(false, "Account not on sale.");
                 }
                 else{
-                    if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                    if(_db.has_hardfork(CHAIN_HARDFORK_11)){
                         //check account recovery request
                         const auto &recovery_request_idx = _db.get_index<account_recovery_request_index>().indices().get<by_account>();
                         auto request = recovery_request_idx.find(op.account);
                         if(request != recovery_request_idx.end()){
                             FC_ASSERT(false, "Account have recovery request.");
                         }
-                        //check account on sale delay
-                        FC_ASSERT(account.account_on_sale_start_time <= _db.head_block_time(),
-                            "Account selling will start on ${t}.",("t",account.account_on_sale_start_time));
-                    }
-                    const auto& account_seller = _db.get_account(account.account_seller);
-                    //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
-                    //    FC_ASSERT(!account_seller.valid, "Account flagged as invalid");
-                    FC_ASSERT(account.account_offer_price == op.account_offer_price,
-                        "Account offer price must be equal account_offer_price in target account: required ${a}, ${p} provided.",("a",account.account_offer_price)("p",op.account_offer_price));
-                    FC_ASSERT(buyer.balance >= (account.account_offer_price + op.tokens_to_shares),
-                        "Inssufficient balance for account_offer_price and tokens_to_shares: required ${a}, ${b} available,",("a",(account.account_offer_price + op.tokens_to_shares))("b",buyer.balance));
 
-                    _db.adjust_balance(buyer, -account.account_offer_price);
-                    _db.adjust_balance(account_seller, account.account_offer_price);
-
-                    _db.adjust_balance(buyer, -op.tokens_to_shares);
-                    _db.create_vesting(account, op.tokens_to_shares);
-
-                    public_key_type account_authorities_key(op.account_authorities_key);
-
-                    _db.modify(account, [&](account_object &a) {
-                        a.account_seller = "";
-                        a.account_offer_price = asset(0, TOKEN_SYMBOL);
-                        a.account_on_sale=false;
-                        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
-                            a.account_on_sale_start_time = fc::time_point_sec::min();
+                        if(account.target_buyer != ""){//have target buyer
+                            if(account.target_buyer != op.buyer){
+                                FC_ASSERT(false, "Account have target buyer: ${b}.", ("b", account.target_buyer));
+                            }
                         }
 
-                        a.subaccount_seller = "";
-                        a.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
-                        a.subaccount_on_sale=false;
+                        if(account.account_on_sale_start_time > _db.head_block_time()){//not >=, only > for bid
+                            //auction mode
+                            asset min_step=asset((account.account_offer_price.amount.value * CHAIN_ACCOUNT_AUCTION_MIN_STEP ) / CHAIN_100_PERCENT, TOKEN_SYMBOL);
+                            if(account.last_bid.amount.value != 0){
+                                min_step.amount.value=std::max(min_step.amount.value, account.current_bid.amount.value - account.last_bid.amount.value);
+                            }
+                            if(account.current_bid.amount.value == 0){
+                                min_step=account.account_offer_price;//minimal bid is offered price, if no bids before
+                            }
+                            if(op.account_offer_price >= (account.current_bid + min_step) ){
+                                //remove old bid
+                                _db.modify(account, [&](account_object &a) {
+                                    if(a.current_bidder != ""){//if was bidder
+                                        //return bid from reserved balance to balance
+                                        const auto& account_bidder = _db.get_account(account.current_bidder);
+                                        _db.modify(account_bidder, [&](account_object &ab) {
+                                            ab.reserved_balance -= account.current_bid;
+                                            ab.balance += account.current_bid;
+                                        });
 
-                        a.memo_key = account_authorities_key;
-                        a.recovery_account = op.buyer;
-                        a.last_account_update = _db.head_block_time();
-                    });
-                    _db.modify(account_auth, [&](account_authority_object &auth) {
-                        auth.master.clear();
-                        auth.master.add_authority( account_authorities_key, 1 );
-                        auth.master.weight_threshold = 1;
-                        auth.active  = auth.master;
-                        auth.regular = auth.active;
-                        auth.last_master_update = _db.head_block_time();
-                    });
-                    _db.push_virtual_operation(
-                        account_sale_operation(op.account,op.account_offer_price,op.buyer,account_seller.name));
+                                        _db.push_virtual_operation(
+                                            outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                        if(a.current_bidder != op.buyer){
+                                            a.last_bid = a.current_bid;//update last bid if bidder not same as current
+                                        }
+                                    }
+
+                                    a.current_bid = op.account_offer_price;
+                                    a.current_bidder = op.buyer;
+                                    a.current_bidder_key = public_key_type(op.account_authorities_key);
+                                    a.account_on_auction=true;
+
+                                    time_point_sec expand_start_time=fc::time_point::now() + CHAIN_ACCOUNT_AUCTION_EXTENSION_TIME;
+                                    a.account_on_sale_start_time = std::max(a.account_on_sale_start_time, expand_start_time);
+
+                                    const auto& new_account_bidder = _db.get_account(op.buyer);
+                                    _db.modify(new_account_bidder, [&](account_object &nab) {
+                                        nab.reserved_balance += op.account_offer_price;
+                                        nab.balance -= op.account_offer_price;
+                                    });
+
+                                    _db.push_virtual_operation(
+                                        bid_operation(account.name,a.current_bidder,a.current_bid));
+                                });
+                            }
+                            else{
+                                FC_ASSERT(false, "Account offer price must be equal or greater minimal bid price: ${bp}.", ("bp",(account.current_bid + min_step)));
+                            }
+                        }
+                        else{//try buy if no bids
+                            if(account.current_bidder == ""){//no bids
+                                const auto& account_seller = _db.get_account(account.account_seller);
+                                //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+                                //    FC_ASSERT(!account_seller.valid, "Account flagged as invalid");
+                                FC_ASSERT(account.account_offer_price == op.account_offer_price,
+                                    "Account offer price must be equal account_offer_price in target account: required ${a}, ${p} provided.",("a",account.account_offer_price)("p",op.account_offer_price));
+                                FC_ASSERT(buyer.balance >= (account.account_offer_price + op.tokens_to_shares),
+                                    "Inssufficient balance for account_offer_price and tokens_to_shares: required ${a}, ${b} available,",("a",(account.account_offer_price + op.tokens_to_shares))("b",buyer.balance));
+
+                                _db.adjust_balance(buyer, -account.account_offer_price);
+                                _db.adjust_balance(account_seller, account.account_offer_price);
+
+                                _db.adjust_balance(buyer, -op.tokens_to_shares);
+                                _db.create_vesting(account, op.tokens_to_shares);
+
+                                public_key_type account_authorities_key(op.account_authorities_key);
+
+                                _db.modify(account, [&](account_object &a) {
+                                    a.account_seller = "";
+                                    a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                    a.account_on_sale=false;
+                                    if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                                        a.account_on_sale_start_time = fc::time_point_sec::min();
+                                    }
+
+                                    a.subaccount_seller = "";
+                                    a.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                                    a.subaccount_on_sale=false;
+
+                                    a.memo_key = account_authorities_key;
+                                    a.recovery_account = op.buyer;
+                                    a.last_account_update = _db.head_block_time();
+                                });
+                                _db.modify(account_auth, [&](account_authority_object &auth) {
+                                    auth.master.clear();
+                                    auth.master.add_authority( account_authorities_key, 1 );
+                                    auth.master.weight_threshold = 1;
+                                    auth.active  = auth.master;
+                                    auth.regular = auth.active;
+                                    auth.last_master_update = _db.head_block_time();
+                                });
+                                _db.push_virtual_operation(
+                                    account_sale_operation(op.account,op.account_offer_price,op.buyer,account_seller.name));
+                            }
+                            else{//impossible condition when tx run on moment when auction is already ended
+                                FC_ASSERT(false, "Account already have bid and waiting release.");
+                            }
+                        }
+                    }
+                    else{
+                        if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                            //check account recovery request
+                            const auto &recovery_request_idx = _db.get_index<account_recovery_request_index>().indices().get<by_account>();
+                            auto request = recovery_request_idx.find(op.account);
+                            if(request != recovery_request_idx.end()){
+                                FC_ASSERT(false, "Account have recovery request.");
+                            }
+                            //check account on sale delay
+                            FC_ASSERT(account.account_on_sale_start_time <= _db.head_block_time(),
+                                "Account selling will start on ${t}.",("t",account.account_on_sale_start_time));
+                        }
+                        const auto& account_seller = _db.get_account(account.account_seller);
+                        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+                        //    FC_ASSERT(!account_seller.valid, "Account flagged as invalid");
+                        FC_ASSERT(account.account_offer_price == op.account_offer_price,
+                            "Account offer price must be equal account_offer_price in target account: required ${a}, ${p} provided.",("a",account.account_offer_price)("p",op.account_offer_price));
+                        FC_ASSERT(buyer.balance >= (account.account_offer_price + op.tokens_to_shares),
+                            "Inssufficient balance for account_offer_price and tokens_to_shares: required ${a}, ${b} available,",("a",(account.account_offer_price + op.tokens_to_shares))("b",buyer.balance));
+
+                        _db.adjust_balance(buyer, -account.account_offer_price);
+                        _db.adjust_balance(account_seller, account.account_offer_price);
+
+                        _db.adjust_balance(buyer, -op.tokens_to_shares);
+                        _db.create_vesting(account, op.tokens_to_shares);
+
+                        public_key_type account_authorities_key(op.account_authorities_key);
+
+                        _db.modify(account, [&](account_object &a) {
+                            a.account_seller = "";
+                            a.account_offer_price = asset(0, TOKEN_SYMBOL);
+                            a.account_on_sale=false;
+                            if(_db.has_hardfork(CHAIN_HARDFORK_9)){
+                                a.account_on_sale_start_time = fc::time_point_sec::min();
+                            }
+
+                            a.subaccount_seller = "";
+                            a.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                            a.subaccount_on_sale=false;
+
+                            a.memo_key = account_authorities_key;
+                            a.recovery_account = op.buyer;
+                            a.last_account_update = _db.head_block_time();
+                        });
+                        _db.modify(account_auth, [&](account_authority_object &auth) {
+                            auth.master.clear();
+                            auth.master.add_authority( account_authorities_key, 1 );
+                            auth.master.weight_threshold = 1;
+                            auth.active  = auth.master;
+                            auth.regular = auth.active;
+                            auth.last_master_update = _db.head_block_time();
+                        });
+                        _db.push_virtual_operation(
+                            account_sale_operation(op.account,op.account_offer_price,op.buyer,account_seller.name));
+                    }
                 }
             }
             else{//not exist, try buy subaccount

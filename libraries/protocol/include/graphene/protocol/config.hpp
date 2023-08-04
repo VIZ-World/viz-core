@@ -110,6 +110,10 @@
 #define CHAIN_IRREVERSIBLE_THRESHOLD          (75 * CHAIN_1_PERCENT)
 /** Irreversibility only counts blocks produced if wit.current_run >= CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN */
 #define CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN    2
+
+#define CHAIN_ACCOUNT_AUCTION_MIN_STEP        (CHAIN_100_PERCENT/10) // 10%
+#define CHAIN_ACCOUNT_AUCTION_EXTENSION_TIME  fc::minutes(5)
+
 #define COMMITTEE_MIN_DURATION                (60*60*24*5)
 #define COMMITTEE_MAX_DURATION                (60*60*24*30)
 #define COMMITTEE_MAX_REQUIRED_AMOUNT         int64_t(CHAIN_INIT_SUPPLY/100)
