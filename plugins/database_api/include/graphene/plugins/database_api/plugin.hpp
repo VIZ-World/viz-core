@@ -98,9 +98,19 @@ struct account_on_sale_api_object {
     asset account_offer_price = asset(0, TOKEN_SYMBOL);
     time_point_sec account_on_sale_start_time = fc::time_point_sec::min();
 
+    std::string target_buyer;//set target buyer, without auction
+
+    bool account_on_auction = false;
+    asset current_bid = asset(0, TOKEN_SYMBOL);//next bid must be >= max(account_offer_price/10,current_bid-last_bid)
+    std::string current_bidder;
+    public_key_type current_bidder_key;
+    asset last_bid = asset(0, TOKEN_SYMBOL);
+
     account_on_sale_api_object(const graphene::chain::account_object &a)
     :   account(a.name), account_seller(a.account_seller), account_offer_price(a.account_offer_price),
-        account_on_sale_start_time(a.account_on_sale_start_time){
+        account_on_sale_start_time(a.account_on_sale_start_time),
+        target_buyer(a.target_buyer), current_bid(a.current_bid),
+        current_bidder(a.current_bidder), current_bidder_key(a.current_bidder_key), last_bid(a.last_bid){
     }
 
 
@@ -155,6 +165,7 @@ DEFINE_API_ARGS(get_database_info,                msg_pack, database_info)
 DEFINE_API_ARGS(get_proposed_transactions,        msg_pack, std::vector<proposal_api_object>)
 
 DEFINE_API_ARGS(get_accounts_on_sale,             msg_pack, std::vector<account_on_sale_api_object>)
+DEFINE_API_ARGS(get_accounts_on_auction,          msg_pack, std::vector<account_on_sale_api_object>)
 DEFINE_API_ARGS(get_subaccounts_on_sale,          msg_pack, std::vector<subaccount_on_sale_api_object>)
 
 
@@ -382,6 +393,7 @@ public:
          * @return List of accounts on sale or subaccounts on sale
          */
         (get_accounts_on_sale)
+        (get_accounts_on_auction)
         (get_subaccounts_on_sale)
     )
 
@@ -412,5 +424,5 @@ FC_REFLECT((graphene::plugins::database_api::signed_block_api_object), (block_id
 FC_REFLECT((graphene::plugins::database_api::database_index_info), (name)(record_count))
 FC_REFLECT((graphene::plugins::database_api::database_info), (total_size)(free_size)(reserved_size)(used_size)(index_list))
 
-FC_REFLECT((graphene::plugins::database_api::account_on_sale_api_object), (account)(account_seller)(account_offer_price)(account_on_sale_start_time))
+FC_REFLECT((graphene::plugins::database_api::account_on_sale_api_object), (account)(account_seller)(account_offer_price)(account_on_sale_start_time)(target_buyer)(current_bid)(current_bidder)(current_bidder_key)(last_bid))
 FC_REFLECT((graphene::plugins::database_api::subaccount_on_sale_api_object), (account)(subaccount_seller)(subaccount_offer_price))

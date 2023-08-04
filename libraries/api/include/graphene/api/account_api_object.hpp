@@ -86,6 +86,16 @@ struct account_api_object {
     account_name_type subaccount_seller;
     asset subaccount_offer_price;
     bool subaccount_on_sale;
+
+    asset reserved_balance;
+
+    account_name_type target_buyer;
+
+    bool account_on_auction;
+    asset current_bid;
+    account_name_type current_bidder;
+    public_key_type current_bidder_key;
+    asset last_bid;
 };
 
 } } // graphene::api
@@ -106,6 +116,8 @@ FC_REFLECT(
     (valid)
     (account_seller)(account_offer_price)(account_on_sale)(account_on_sale_start_time)
     (subaccount_seller)(subaccount_offer_price)(subaccount_on_sale)
+    (reserved_balance)(target_buyer)
+    (account_on_auction)(current_bid)(current_bidder)(current_bidder_key)(last_bid)
 )
 
 #endif //CHAIN_ACCOUNT_API_OBJ_HPP

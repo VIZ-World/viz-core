@@ -74,6 +74,7 @@ public:
 
     // Accounts or subaccounts on sale
     std::vector<account_on_sale_api_object> get_accounts_on_sale(uint32_t from, uint32_t limit) const;
+    std::vector<account_on_sale_api_object> get_accounts_on_auction(uint32_t from, uint32_t limit) const;
     std::vector<subaccount_on_sale_api_object> get_subaccounts_on_sale(uint32_t from, uint32_t limit) const;
 
     // Globals
@@ -469,6 +470,38 @@ DEFINE_API(plugin, get_accounts_on_sale) {
         while (result.size() < limit && itr != idx.end() && itr->account_on_sale == true) {
             if(itr->account_on_sale_start_time <= my->database().head_block_time()){
                 result.push_back(account_object(*itr));
+            }
+            ++itr;
+        }
+        return result;
+    });
+}
+
+DEFINE_API(plugin, get_accounts_on_auction) {
+    CHECK_ARG_SIZE(2)
+    uint32_t from = args.args->at(0).as<uint32_t>();
+    uint32_t limit = args.args->at(1).as<uint32_t>();
+    FC_ASSERT(limit <= 1000);
+    return my->database().with_weak_read_lock([&]() {
+        std::vector<account_on_sale_api_object> result;
+
+        result.reserve(limit);
+
+        const auto &idx = my->database().get_index<account_index>().indices().get<by_account_on_sale>();
+        auto itr = idx.lower_bound(true);
+        while(from>0 && itr != idx.end() && itr->account_on_sale == true){
+            ++itr;
+            if(itr->account_on_sale_start_time >= my->database().head_block_time()){
+                if(itr->target_buyer == ""){
+                    from--;
+                }
+            }
+        }
+        while (result.size() < limit && itr != idx.end() && itr->account_on_sale == true) {
+            if(itr->account_on_sale_start_time >= my->database().head_block_time()){
+                if(itr->target_buyer == ""){
+                    result.push_back(account_object(*itr));
+                }
             }
             ++itr;
         }
