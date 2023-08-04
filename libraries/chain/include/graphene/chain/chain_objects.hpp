@@ -182,25 +182,12 @@ namespace graphene {
             block_post_validation_object() {
             }
 
-            block_post_validation_object(const block_post_validation_object &bplo)
-                    : block_num(bplo.block_num), block_id(bplo.block_id) {
-                std::copy(bplo.current_shuffled_witnesses.begin(), bplo.current_shuffled_witnesses.end(),
-                        current_shuffled_witnesses.begin());
-            }
-
-            block_post_validation_object(uint32_t block_num,
-                    block_id_type block_id,
-                    const fc::array<account_name_type, CHAIN_MAX_WITNESSES> &current_shuffled_witnesses) :
-                    block_num(block_num),
-                    block_id(block_id),
-                    current_shuffled_witnesses(current_shuffled_witnesses){
-            }
-
             id_type id;
 
             uint32_t block_num = 0;
             block_id_type block_id;
             fc::array<account_name_type, CHAIN_MAX_WITNESSES> current_shuffled_witnesses;
+            fc::array<bool, CHAIN_MAX_WITNESSES> current_shuffled_witnesses_validations;
         };
         typedef multi_index_container <
             block_post_validation_object,
@@ -234,5 +221,5 @@ FC_REFLECT((graphene::chain::award_shares_expire_object),
 CHAINBASE_SET_INDEX_TYPE(graphene::chain::award_shares_expire_object, graphene::chain::award_shares_expire_index)
 
 FC_REFLECT((graphene::chain::block_post_validation_object),
-    (block_num)(block_id)(current_shuffled_witnesses))
+    (id)(block_num)(block_id)(current_shuffled_witnesses)(current_shuffled_witnesses_validations))
 CHAINBASE_SET_INDEX_TYPE(graphene::chain::block_post_validation_object, graphene::chain::block_post_validation_index)
