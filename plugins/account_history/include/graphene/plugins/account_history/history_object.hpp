@@ -50,12 +50,14 @@ namespace graphene { namespace plugins { namespace account_history {
         id_type id;
 
         account_name_type account;
+        uint32_t block = 0;
         uint32_t sequence = 0;
         operation_id_type op;
     };
 
     using account_history_id_type = object_id<account_history_object>;
 
+    struct by_block;
     struct by_account;
     using account_history_index = multi_index_container<
         account_history_object,
@@ -63,6 +65,9 @@ namespace graphene { namespace plugins { namespace account_history {
             ordered_unique<
                 tag<by_id>,
                 member<account_history_object, account_history_id_type, &account_history_object::id>>,
+            ordered_non_unique<tag<by_block>,
+                composite_key<account_history_object,
+                    member<account_history_object, uint32_t, &account_history_object::block>>>,
             ordered_unique<tag<by_account>,
                 composite_key<account_history_object,
                     member<account_history_object, account_name_type, &account_history_object::account>,
@@ -75,4 +80,3 @@ namespace graphene { namespace plugins { namespace account_history {
 CHAINBASE_SET_INDEX_TYPE(
     graphene::plugins::account_history::account_history_object,
     graphene::plugins::account_history::account_history_index)
-
