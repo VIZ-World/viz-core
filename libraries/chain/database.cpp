@@ -2601,6 +2601,280 @@ namespace graphene { namespace chain {
             }
         }
 
+        void database::account_on_auction_expiration() {
+            const auto &idx = get_index<account_index>().indices().get<by_account_on_auction>();
+            auto itr = idx.lower_bound(true);
+            while(itr != idx.end()) {
+                const auto &current = *itr;
+                ++itr;
+                if(current.account_on_sale_start_time <= head_block_time()){//expiration
+                    modify(current, [&](account_object &account){
+                        if(account.target_buyer == ""){//no target buyer
+                            if(account.current_bidder == ""){//no bidder - empty auction data
+                                account.account_on_auction=false;
+                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                account.current_bidder = "";
+                                account.current_bidder_key = public_key_type();
+                                account.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                            else{//if bidder exist
+                                const auto& account_bidder = get_account(account.current_bidder);
+                                if(account.account_on_sale){
+                                    if(account.current_bid.amount >= account.account_offer_price.amount){
+                                        //check account recovery request
+                                        const auto &recovery_request_idx = get_index<account_recovery_request_index>().indices().get<by_account>();
+                                        auto request = recovery_request_idx.find(account.name);
+                                        if(request != recovery_request_idx.end()){//some recovery found
+                                            //empty on sale status and need to return the tokens
+
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                                ab.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                            //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                                            //account.account_seller = "";
+                                            account.account_on_sale=false;
+                                            account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+                                        }
+                                        else{
+                                            const auto& account_seller = get_account(account.account_seller);
+
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                            });
+
+                                            modify(account_seller, [&](account_object &as) {
+                                                as.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                account_sale_operation(account.name,account.current_bid,account.current_bidder,account_seller.name));
+
+                                            public_key_type account_authorities_key(account.current_bidder_key);
+
+                                            const auto& account_auth = get<account_authority_object, by_account>(account.name);
+                                            modify(account_auth, [&](account_authority_object &auth) {
+                                                auth.master.clear();
+                                                auth.master.add_authority( account_authorities_key, 1 );
+                                                auth.master.weight_threshold = 1;
+                                                auth.active  = auth.master;
+                                                auth.regular = auth.active;
+                                                auth.last_master_update = head_block_time();
+                                            });
+
+                                            account.account_seller = "";
+                                            account.account_on_sale=false;
+                                            account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                            account.subaccount_seller = "";
+                                            account.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.subaccount_on_sale=false;
+
+                                            account.memo_key = account_authorities_key;
+                                            account.recovery_account = account_bidder.name;
+                                            account.last_account_update = head_block_time();
+                                        }
+                                    }
+                                    else{//imposible condition
+                                        //return reserve to bidder
+                                        modify(account_bidder, [&](account_object &ab) {
+                                            ab.reserved_balance -= account.current_bid;
+                                            ab.balance += account.current_bid;
+                                        });
+
+                                        push_virtual_operation(
+                                            outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                        account.account_on_auction=false;
+                                        account.current_bid = asset(0, TOKEN_SYMBOL);
+                                        account.current_bidder = "";
+                                        account.current_bidder_key = public_key_type();
+                                        account.last_bid = asset(0, TOKEN_SYMBOL);
+                                    }
+                                }
+                                else{//imposible condition
+                                    //return bid reserve to bidder
+                                    modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                        }
+                        else{//target buyer exist
+                            if(account.current_bidder == ""){//no bidder - empty auction data
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                            else{
+                                const auto& account_bidder = get_account(account.current_bidder);
+                                if(account.current_bidder == account.target_buyer){
+                                    //buyer already reserved balance as bidder
+                                    if(account.account_on_sale){
+                                        if(account.current_bid.amount >= account.account_offer_price.amount){
+                                            //check account recovery request
+                                            const auto &recovery_request_idx = get_index<account_recovery_request_index>().indices().get<by_account>();
+                                            auto request = recovery_request_idx.find(account.name);
+                                            if(request != recovery_request_idx.end()){//some recovery found
+                                                //empty on sale status and need to return the tokens
+
+                                                modify(account_bidder, [&](account_object &ab) {
+                                                    ab.reserved_balance -= account.current_bid;
+                                                    ab.balance += account.current_bid;
+                                                });
+
+                                                push_virtual_operation(
+                                                    outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                                //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                                                //account.account_seller = "";
+                                                account.account_on_sale=false;
+                                                account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                                account.account_on_auction=false;
+                                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                                account.current_bidder = "";
+                                                account.current_bidder_key = public_key_type();
+                                                account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                                account.target_buyer = "";
+                                            }
+                                            else{
+                                                const auto& account_seller = get_account(account.account_seller);
+
+                                                modify(account_bidder, [&](account_object &ab) {
+                                                    ab.reserved_balance -= account.current_bid;
+                                                });
+
+                                                modify(account_seller, [&](account_object &as) {
+                                                    as.balance += account.current_bid;
+                                                });
+
+                                                push_virtual_operation(
+                                                    account_sale_operation(account.name,account.current_bid,account.current_bidder,account_seller.name));
+
+                                                public_key_type account_authorities_key(account.current_bidder_key);
+
+                                                const auto& account_auth = get<account_authority_object, by_account>(account.name);
+                                                modify(account_auth, [&](account_authority_object &auth) {
+                                                    auth.master.clear();
+                                                    auth.master.add_authority( account_authorities_key, 1 );
+                                                    auth.master.weight_threshold = 1;
+                                                    auth.active  = auth.master;
+                                                    auth.regular = auth.active;
+                                                    auth.last_master_update = head_block_time();
+                                                });
+
+                                                account.account_seller = "";
+                                                account.account_on_sale=false;
+                                                account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                                account.target_buyer = "";
+
+                                                account.account_on_auction=false;
+                                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                                account.current_bidder = "";
+                                                account.current_bidder_key = public_key_type();
+                                                account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                                account.subaccount_seller = "";
+                                                account.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.subaccount_on_sale=false;
+
+                                                account.memo_key = account_authorities_key;
+                                                account.recovery_account = account_bidder.name;
+                                                account.last_account_update = head_block_time();
+                                            }
+                                        }
+                                        else{//imposible condition
+                                            //return reserve to bidder
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                                ab.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+                                        }
+                                    }
+                                    else{//imposible condition
+                                        //return bid reserve to bidder
+                                        modify(account_bidder, [&](account_object &ab) {
+                                            ab.reserved_balance -= account.current_bid;
+                                            ab.balance += account.current_bid;
+                                        });
+
+                                        push_virtual_operation(
+                                            outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                        account.account_on_auction=false;
+                                        account.current_bid = asset(0, TOKEN_SYMBOL);
+                                        account.current_bidder = "";
+                                        account.current_bidder_key = public_key_type();
+                                        account.last_bid = asset(0, TOKEN_SYMBOL);
+                                    }
+                                }
+                                else{//if current bidder is not target buyer (imposible condition)
+                                    //return bid reserve to bidder
+                                    modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
         time_point_sec database::head_block_time() const {
             return get_dynamic_global_properties().time;
         }
@@ -2658,6 +2932,8 @@ namespace graphene { namespace chain {
             _my->_evaluator_registry.register_evaluator<set_subaccount_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<buy_account_evaluator>();
             _my->_evaluator_registry.register_evaluator<use_invite_balance_evaluator>();
+            _my->_evaluator_registry.register_evaluator<fixed_award_evaluator>();
+            _my->_evaluator_registry.register_evaluator<target_account_sale_evaluator>();
         }
 
         void database::set_custom_operation_interpreter(const std::string &id, std::shared_ptr<custom_operation_interpreter> registry) {
@@ -3304,6 +3580,10 @@ namespace graphene { namespace chain {
 
                 account_recovery_processing();
                 expire_escrow_ratification();
+
+                if(has_hardfork(CHAIN_HARDFORK_11)){
+                    account_on_auction_expiration();
+                }
 
                 clear_null_account_balance();
                 clear_anonymous_account_balance();
