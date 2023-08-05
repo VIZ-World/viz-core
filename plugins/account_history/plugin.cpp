@@ -418,6 +418,10 @@ if( options.count(name) ) { \
             boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
             "Defines a range of accounts to track as a json pair [\"from\",\"to\"] [from,to]. "
             "Can be specified multiple times"
+        ) (
+            "history-count-blocks",
+            boost::program_options::value<uint32_t>(),
+            "Defines depth of history for recording stats."
         );
         cfg.add(cli);
     }
