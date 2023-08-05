@@ -60,6 +60,7 @@ if( options.count(name) ) { \
 
             database.create<account_history_object>([&](account_history_object& history) {
                 history.account = account;
+                history.block = note.block;
                 history.sequence = sequence;
                 history.op = operation_history::operation_id_type(note.db_id);
             });
@@ -74,6 +75,23 @@ if( options.count(name) ) { \
 
         ~plugin_impl() = default;
 
+        void purge_old_history(){
+            uint32_t head_block = database.head_block_num();
+            //ilog("account_history: purge_old_history START ${c} <= ${h}", ("c",history_count_blocks)("h", head_block));
+            if (history_count_blocks <= head_block) {
+                uint32_t need_block = head_block - history_count_blocks;
+                const auto& idx = database.get_index<account_history_index>().indices().get<by_block>();
+                auto it = idx.begin();
+                while (it != idx.end() && it->block <= need_block) {
+                    auto next_it = it;
+                    ++next_it;
+                    //ilog("account_history: REMOVE ${c}", ("c",it->block));
+                    database.remove(*it);
+                    it = next_it;
+                }
+            }
+        }
+
         void on_operation(const graphene::chain::operation_notification& note) {
             if (!note.stored_in_db) {
                 return;
@@ -83,11 +101,14 @@ if( options.count(name) ) { \
             operation_get_impacted_accounts(note.op, impacted);
 
             for (const auto& item : impacted) {
-                auto itr = tracked_accounts.lower_bound(item);
-                if (!tracked_accounts.size() ||
-                    (itr != tracked_accounts.end() && itr->first <= item && item <= itr->second)
-                ) {
+                if (0 == tracked_accounts.size()) {
                     note.op.visit(operation_visitor(database, note, item));
+                }
+                else{
+                    auto itr = tracked_accounts.lower_bound(item);
+                    if (itr != tracked_accounts.end() && itr->first <= item && item <= itr->second) {
+                        note.op.visit(operation_visitor(database, note, item));
+                    }
                 }
             }
         }
@@ -115,6 +136,7 @@ if( options.count(name) ) { \
 
         fc::flat_map<std::string, std::string> tracked_accounts;
         graphene::chain::database& database;
+        uint32_t history_count_blocks = UINT32_MAX;
     };
 
     DEFINE_API(plugin, get_account_history) {
@@ -327,12 +349,19 @@ if( options.count(name) ) { \
             impacted.insert(op.account_seller);
         }
 
+        void operator()(const target_account_sale_operation& op) {
+            impacted.insert(op.account);
+            impacted.insert(op.account_seller);
+            impacted.insert(op.target_buyer);
+        }
+
         void operator()(const set_subaccount_price_operation& op) {
             impacted.insert(op.account);
             impacted.insert(op.subaccount_seller);
         }
 
         void operator()(const buy_account_operation& op) {
+            impacted.insert(op.account);
             impacted.insert(op.buyer);
         }
 
@@ -340,6 +369,16 @@ if( options.count(name) ) { \
             impacted.insert(op.buyer);
             impacted.insert(op.seller);
             impacted.insert(op.account);
+        }
+
+        void operator()(const bid_operation& op) {
+            impacted.insert(op.account);
+            impacted.insert(op.bidder);
+        }
+
+        void operator()(const outbid_operation& op) {
+            impacted.insert(op.account);
+            impacted.insert(op.bidder);
         }
 
         void operator()(const create_invite_operation& op) {
@@ -389,6 +428,18 @@ if( options.count(name) ) { \
     void plugin::plugin_initialize(const boost::program_options::variables_map& options) {
         ilog("account_history plugin: plugin_initialize() begin");
         pimpl = std::make_unique<plugin_impl>();
+
+        if (options.count("history-count-blocks")) {
+            uint32_t history_count_blocks = options.at("history-count-blocks").as<uint32_t>();
+            pimpl->history_count_blocks = history_count_blocks;
+            pimpl->database.applied_block.connect([&](const signed_block& block){
+                pimpl->purge_old_history();
+            });
+        } else {
+            pimpl->history_count_blocks = UINT32_MAX;
+        }
+        ilog("account_history: history-count-blocks ${s}", ("s", pimpl->history_count_blocks));
+
         // this is worked, because the appbase initialize required plugins at first
         pimpl->database.pre_apply_operation.connect([&](graphene::chain::operation_notification& note){
             pimpl->on_operation(note);

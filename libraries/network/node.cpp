@@ -901,7 +901,7 @@ namespace graphene {
                     _maximum_number_of_sync_blocks_to_prefetch(MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH),
                     _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING) {
                 _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
-                fc::rand_pseudo_bytes(&_node_id.data[0], (int)_node_id.size());
+                fc::rand_bytes(&_node_id.data[0], (int)_node_id.size());
             }
 
             node_impl::~node_impl() {
@@ -4917,6 +4917,7 @@ namespace graphene {
                     hash_of_message_contents = transaction_message_to_broadcast.trx.id(); // for debugging
                     dlog("broadcasting trx: ${trx}", ("trx", transaction_message_to_broadcast));
                 }
+
                 message_hash_type hash_of_item_to_broadcast = item_to_broadcast.id();
 
                 _message_cache.cache_message(item_to_broadcast, hash_of_item_to_broadcast, propagation_data, hash_of_message_contents);

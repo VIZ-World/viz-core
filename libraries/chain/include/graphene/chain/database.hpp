@@ -21,6 +21,7 @@ namespace graphene { namespace chain {
         using graphene::protocol::asset;
         using graphene::protocol::asset_symbol_type;
         using graphene::protocol::price;
+        using graphene::protocol::public_key_type;
 
         class database_impl;
 
@@ -384,8 +385,13 @@ namespace graphene { namespace chain {
 
             void expire_escrow_ratification();
 
+            void account_on_auction_expiration();
+
             share_type claim_rshare_reward(share_type rshares);
             share_type claim_rshare_award(share_type rshares);
+
+            share_type calc_rshare_award(share_type rshares);
+            int64_t calc_rshare_by_reward(const asset &reward_amount);
 
             time_point_sec head_block_time() const;
 
@@ -438,6 +444,16 @@ namespace graphene { namespace chain {
             void set_flush_interval(uint32_t flush_blocks);
 
             const block_log &get_block_log() const;
+
+            public_key_type get_witness_key(const account_name_type &name);
+
+            void create_block_post_validation(uint32_t block_num, block_id_type block_id, const account_name_type &witness_account);
+
+            std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> get_block_post_validations(const account_name_type &witness_account);
+
+            void apply_block_post_validation(block_id_type block_id, const account_name_type &witness_account);
+
+            void check_block_post_validation_chain();
 
         protected:
             //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead

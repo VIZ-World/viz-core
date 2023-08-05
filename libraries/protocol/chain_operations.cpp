@@ -408,4 +408,40 @@ namespace graphene { namespace protocol {
             validate_account_name(receiver);
         }
 
+        void fixed_award_operation::validate() const {
+            validate_account_name(initiator);
+            validate_account_name(receiver);
+            FC_ASSERT(is_asset_type(reward_amount, TOKEN_SYMBOL), "Reward amount must be TOKEN_SYMBOL");
+            FC_ASSERT(reward_amount.amount > 0, "Reward amount cannot be negative or zero amount");
+            FC_ASSERT(max_energy >= 0);
+            FC_ASSERT(max_energy <= CHAIN_100_PERCENT);
+            FC_ASSERT(custom_sequence >= 0);
+            FC_ASSERT(custom_sequence <= uint64_t(std::numeric_limits<int64_t>::max()));
+            FC_ASSERT(memo.size() <
+                      CHAIN_MAX_MEMO_LENGTH, "Memo is too large");
+            FC_ASSERT(fc::is_utf8(memo), "Memo is not UTF8");
+
+            uint32_t sum = 0;
+
+            FC_ASSERT(beneficiaries.size() < 128,
+                      "Cannot specify more than 127 beneficiaries."); // Require size serialization fits in one byte.
+
+            for (size_t i = 0; i < beneficiaries.size(); i++) {
+                validate_account_name( beneficiaries[i].account);
+                FC_ASSERT(beneficiaries[i].weight <= CHAIN_100_PERCENT,
+                          "Cannot allocate more than 100% of rewards to one account");
+                sum += beneficiaries[i].weight;
+                FC_ASSERT(sum <= CHAIN_100_PERCENT,
+                          "Cannot allocate more than 100% of rewards to a content"); // Have to check incrementally to avoid overflow
+            }
+        }
+
+        void target_account_sale_operation::validate() const {
+            validate_account_name(account);
+            validate_account_name(account_seller);
+            validate_account_name(target_buyer);
+            FC_ASSERT(is_asset_type(account_offer_price, TOKEN_SYMBOL), "Account offer price must be TOKEN_SYMBOL");
+            FC_ASSERT(account_offer_price.amount > 0, "Cannot set account offer price with negative or zero amount");
+        }
+
 } } // graphene::protocol

@@ -22,6 +22,7 @@
 #include <graphene/chain/invite_objects.hpp>
 #include <graphene/chain/paid_subscription_objects.hpp>
 
+#include <fc/bitutil.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 #include <fc/container/deque.hpp>
@@ -2339,33 +2340,18 @@ namespace graphene { namespace chain {
 
         void database::process_funds() {
             const auto &props = get_dynamic_global_properties();
-            share_type inflation_rate = int64_t( CHAIN_FIXED_INFLATION );
-            share_type new_supply = int64_t( CHAIN_INIT_SUPPLY );
-            share_type inflation_per_year = inflation_rate * int64_t( CHAIN_INIT_SUPPLY ) / int64_t( CHAIN_100_PERCENT );
-            new_supply += inflation_per_year;
-            int circles = props.head_block_number / CHAIN_BLOCKS_PER_YEAR;
-            if(circles > 0)
-            {
-               for( int itr = 0; itr < circles; ++itr )
-               {
-                  inflation_per_year = ( new_supply * inflation_rate ) / int64_t( CHAIN_100_PERCENT );
-                  new_supply += inflation_per_year;
-               }
-            }
-            share_type inflation_per_block = inflation_per_year / int64_t( CHAIN_BLOCKS_PER_YEAR );
-
-            if(has_hardfork(CHAIN_HARDFORK_4)){//consensus inflation model
-                auto witness_reward = ( inflation_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
-                auto inflation_ratio_reward = inflation_per_block - witness_reward;
-                auto committee_reward = ( inflation_ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
-                auto content_reward = inflation_ratio_reward - committee_reward;
-                inflation_per_block = witness_reward + committee_reward + content_reward;
-
+            if(has_hardfork(CHAIN_HARDFORK_11)){//new emission model (fixed amount of digital asset per block)
+                share_type digital_asset_per_block = int64_t( CHAIN_DIGITAL_ASSET_ISSUED_PER_BLOCK );
+                auto witness_reward = ( digital_asset_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
+                auto ratio_reward = digital_asset_per_block - witness_reward;
+                auto committee_part = ( ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
+                auto reward_fund_part = ratio_reward - committee_part;
+                digital_asset_per_block = witness_reward + committee_part + reward_fund_part;
                 modify( props, [&]( dynamic_global_property_object& p )
                 {
-                   p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
-                   p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
-                   p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    p.committee_fund += asset( committee_part, TOKEN_SYMBOL );
+                    p.total_reward_fund += asset( reward_fund_part, TOKEN_SYMBOL );
+                    p.current_supply += asset( digital_asset_per_block, TOKEN_SYMBOL );
                 });
 
                 const auto& cwit = get_witness( props.current_witness );
@@ -2373,32 +2359,67 @@ namespace graphene { namespace chain {
                 push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
             }
             else{
-                /*ilog( "Inflation status: props.head_block_number=${h1}, inflation_per_year=${h2}, new_supply=${h3}, inflation_per_block=${h4}",
-                   ("h1",props.head_block_number)("h2", inflation_per_year)("h3",new_supply)("h4",inflation_per_block)
-                );*/
-                auto content_reward = ( inflation_per_block * CHAIN_REWARD_FUND_PERCENT ) / CHAIN_100_PERCENT;
-                auto vesting_reward = ( inflation_per_block * CHAIN_VESTING_FUND_PERCENT ) / CHAIN_100_PERCENT; /// 15% to vesting fund
-                auto committee_reward = ( inflation_per_block * CHAIN_COMMITTEE_FUND_PERCENT ) / CHAIN_100_PERCENT;
-                auto witness_reward = inflation_per_block - content_reward - vesting_reward - committee_reward; /// Remaining 10% to witness pay
-
-                const auto& cwit = get_witness( props.current_witness );
-
-                inflation_per_block = content_reward + vesting_reward + committee_reward + witness_reward;
-                /*
-                elog( "Final inflation_per_block=${h1}, content_reward=${h2}, committee_reward=${h3}, witness_reward=${h4}, vesting_reward=${h5}",
-                   ("h1",inflation_per_block)("h2", content_reward)("h3",committee_reward)("h4",witness_reward)("h5",vesting_reward)
-                );
-                */
-                modify( props, [&]( dynamic_global_property_object& p )
+                share_type inflation_rate = int64_t( CHAIN_FIXED_INFLATION );
+                share_type new_supply = int64_t( CHAIN_INIT_SUPPLY );
+                share_type inflation_per_year = inflation_rate * int64_t( CHAIN_INIT_SUPPLY ) / int64_t( CHAIN_100_PERCENT );
+                new_supply += inflation_per_year;
+                int circles = props.head_block_number / CHAIN_BLOCKS_PER_YEAR;
+                if(circles > 0)
                 {
-                   p.total_vesting_fund += asset( vesting_reward, TOKEN_SYMBOL );
-                   p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
-                   p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
-                   p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
-                });
+                for( int itr = 0; itr < circles; ++itr )
+                {
+                    inflation_per_year = ( new_supply * inflation_rate ) / int64_t( CHAIN_100_PERCENT );
+                    new_supply += inflation_per_year;
+                }
+                }
+                share_type inflation_per_block = inflation_per_year / int64_t( CHAIN_BLOCKS_PER_YEAR );
 
-                auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
-                push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                if(has_hardfork(CHAIN_HARDFORK_4)){//consensus inflation model
+                    auto witness_reward = ( inflation_per_block * props.inflation_witness_percent ) / CHAIN_100_PERCENT;
+                    auto inflation_ratio_reward = inflation_per_block - witness_reward;
+                    auto committee_reward = ( inflation_ratio_reward * props.inflation_ratio ) / CHAIN_100_PERCENT;
+                    auto content_reward = inflation_ratio_reward - committee_reward;
+                    inflation_per_block = witness_reward + committee_reward + content_reward;
+
+                    modify( props, [&]( dynamic_global_property_object& p )
+                    {
+                        p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
+                        p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
+                        p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    });
+
+                    const auto& cwit = get_witness( props.current_witness );
+                    auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
+                    push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                }
+                else{
+                    /*ilog( "Inflation status: props.head_block_number=${h1}, inflation_per_year=${h2}, new_supply=${h3}, inflation_per_block=${h4}",
+                    ("h1",props.head_block_number)("h2", inflation_per_year)("h3",new_supply)("h4",inflation_per_block)
+                    );*/
+                    auto content_reward = ( inflation_per_block * CHAIN_REWARD_FUND_PERCENT ) / CHAIN_100_PERCENT;
+                    auto vesting_reward = ( inflation_per_block * CHAIN_VESTING_FUND_PERCENT ) / CHAIN_100_PERCENT; /// 15% to vesting fund
+                    auto committee_reward = ( inflation_per_block * CHAIN_COMMITTEE_FUND_PERCENT ) / CHAIN_100_PERCENT;
+                    auto witness_reward = inflation_per_block - content_reward - vesting_reward - committee_reward; /// Remaining 10% to witness pay
+
+                    const auto& cwit = get_witness( props.current_witness );
+
+                    inflation_per_block = content_reward + vesting_reward + committee_reward + witness_reward;
+                    /*
+                    elog( "Final inflation_per_block=${h1}, content_reward=${h2}, committee_reward=${h3}, witness_reward=${h4}, vesting_reward=${h5}",
+                    ("h1",inflation_per_block)("h2", content_reward)("h3",committee_reward)("h4",witness_reward)("h5",vesting_reward)
+                    );
+                    */
+                    modify( props, [&]( dynamic_global_property_object& p )
+                    {
+                        p.total_vesting_fund += asset( vesting_reward, TOKEN_SYMBOL );
+                        p.committee_fund += asset( committee_reward, TOKEN_SYMBOL );
+                        p.total_reward_fund += asset( content_reward, TOKEN_SYMBOL );
+                        p.current_supply += asset( inflation_per_block, TOKEN_SYMBOL );
+                    });
+
+                    auto witness_reward_shares = create_vesting(get_account(cwit.owner), asset(witness_reward, TOKEN_SYMBOL));
+                    push_virtual_operation(witness_reward_operation(cwit.owner,witness_reward_shares));
+                }
             }
         }
 
@@ -2458,6 +2479,51 @@ namespace graphene { namespace chain {
                 });
                 return payout;
             } FC_CAPTURE_AND_RETHROW((rshares))
+        }
+
+        share_type database::calc_rshare_award(share_type rshares) {
+        try {
+                FC_ASSERT(rshares > 0);
+
+                const auto &props = get_dynamic_global_properties();
+
+                u256 rs(rshares.value);
+                u256 rf(props.total_reward_fund.amount.value);
+                u256 total_rshares = to256(props.total_reward_shares);
+                total_rshares += to256(rshares.value);
+
+                u256 payout_u256 = (rf * rs) / total_rshares;
+                FC_ASSERT(payout_u256 <=
+                          u256(uint64_t(std::numeric_limits<int64_t>::max())));
+                uint64_t payout = static_cast< uint64_t >( payout_u256 );
+
+                return payout;
+            } FC_CAPTURE_AND_RETHROW((rshares))
+        }
+
+        int64_t database::calc_rshare_by_reward(const asset &reward_amount) {
+        try {
+                const auto &props = get_dynamic_global_properties();
+
+                //calc reward shares (rs) by fixed reward amount (ra)
+                u256 rs(0);//unknown reward shares
+                u256 ra(reward_amount.amount.value);//fixed reward amount
+                u256 rf(props.total_reward_fund.amount.value);//reward fund
+                u256 total_rshares = to256(props.total_reward_shares);//competition for reward fund
+
+                //ra = rf * rs / (total_rshares + rs)
+                //ra * total_rshares + ra * rs = rf * rs
+                //ra * total_rshares = rf * rs - ra * rs
+                //ra * total_rshares = rs * (rf - ra)
+                //rs = (ra * total_rshares) / (rf - ra)
+                rs = (ra * total_rshares) / (rf - ra);
+
+                //check rs not exceed int64_t
+                FC_ASSERT(rs <=
+                          u256(uint64_t(std::numeric_limits<int64_t>::max())));
+
+                return static_cast< int64_t >( rs );
+            } FC_CAPTURE_AND_RETHROW()
         }
 
         void database::expire_award_shares_processing() {
@@ -2535,6 +2601,280 @@ namespace graphene { namespace chain {
             }
         }
 
+        void database::account_on_auction_expiration() {
+            const auto &idx = get_index<account_index>().indices().get<by_account_on_auction>();
+            auto itr = idx.lower_bound(true);
+            while(itr != idx.end()) {
+                const auto &current = *itr;
+                ++itr;
+                if(current.account_on_sale_start_time <= head_block_time()){//expiration
+                    modify(current, [&](account_object &account){
+                        if(account.target_buyer == ""){//no target buyer
+                            if(account.current_bidder == ""){//no bidder - empty auction data
+                                account.account_on_auction=false;
+                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                account.current_bidder = "";
+                                account.current_bidder_key = public_key_type();
+                                account.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                            else{//if bidder exist
+                                const auto& account_bidder = get_account(account.current_bidder);
+                                if(account.account_on_sale){
+                                    if(account.current_bid.amount >= account.account_offer_price.amount){
+                                        //check account recovery request
+                                        const auto &recovery_request_idx = get_index<account_recovery_request_index>().indices().get<by_account>();
+                                        auto request = recovery_request_idx.find(account.name);
+                                        if(request != recovery_request_idx.end()){//some recovery found
+                                            //empty on sale status and need to return the tokens
+
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                                ab.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                            //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                                            //account.account_seller = "";
+                                            account.account_on_sale=false;
+                                            account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+                                        }
+                                        else{
+                                            const auto& account_seller = get_account(account.account_seller);
+
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                            });
+
+                                            modify(account_seller, [&](account_object &as) {
+                                                as.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                account_sale_operation(account.name,account.current_bid,account.current_bidder,account_seller.name));
+
+                                            public_key_type account_authorities_key(account.current_bidder_key);
+
+                                            const auto& account_auth = get<account_authority_object, by_account>(account.name);
+                                            modify(account_auth, [&](account_authority_object &auth) {
+                                                auth.master.clear();
+                                                auth.master.add_authority( account_authorities_key, 1 );
+                                                auth.master.weight_threshold = 1;
+                                                auth.active  = auth.master;
+                                                auth.regular = auth.active;
+                                                auth.last_master_update = head_block_time();
+                                            });
+
+                                            account.account_seller = "";
+                                            account.account_on_sale=false;
+                                            account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                            account.subaccount_seller = "";
+                                            account.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                                            account.subaccount_on_sale=false;
+
+                                            account.memo_key = account_authorities_key;
+                                            account.recovery_account = account_bidder.name;
+                                            account.last_account_update = head_block_time();
+                                        }
+                                    }
+                                    else{//imposible condition
+                                        //return reserve to bidder
+                                        modify(account_bidder, [&](account_object &ab) {
+                                            ab.reserved_balance -= account.current_bid;
+                                            ab.balance += account.current_bid;
+                                        });
+
+                                        push_virtual_operation(
+                                            outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                        account.account_on_auction=false;
+                                        account.current_bid = asset(0, TOKEN_SYMBOL);
+                                        account.current_bidder = "";
+                                        account.current_bidder_key = public_key_type();
+                                        account.last_bid = asset(0, TOKEN_SYMBOL);
+                                    }
+                                }
+                                else{//imposible condition
+                                    //return bid reserve to bidder
+                                    modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                        }
+                        else{//target buyer exist
+                            if(account.current_bidder == ""){//no bidder - empty auction data
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                            }
+                            else{
+                                const auto& account_bidder = get_account(account.current_bidder);
+                                if(account.current_bidder == account.target_buyer){
+                                    //buyer already reserved balance as bidder
+                                    if(account.account_on_sale){
+                                        if(account.current_bid.amount >= account.account_offer_price.amount){
+                                            //check account recovery request
+                                            const auto &recovery_request_idx = get_index<account_recovery_request_index>().indices().get<by_account>();
+                                            auto request = recovery_request_idx.find(account.name);
+                                            if(request != recovery_request_idx.end()){//some recovery found
+                                                //empty on sale status and need to return the tokens
+
+                                                modify(account_bidder, [&](account_object &ab) {
+                                                    ab.reserved_balance -= account.current_bid;
+                                                    ab.balance += account.current_bid;
+                                                });
+
+                                                push_virtual_operation(
+                                                    outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                                //account_seller as indicator that fee was paid in set_account_price or arget_account_sale
+                                                //account.account_seller = "";
+                                                account.account_on_sale=false;
+                                                account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                                account.account_on_auction=false;
+                                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                                account.current_bidder = "";
+                                                account.current_bidder_key = public_key_type();
+                                                account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                                account.target_buyer = "";
+                                            }
+                                            else{
+                                                const auto& account_seller = get_account(account.account_seller);
+
+                                                modify(account_bidder, [&](account_object &ab) {
+                                                    ab.reserved_balance -= account.current_bid;
+                                                });
+
+                                                modify(account_seller, [&](account_object &as) {
+                                                    as.balance += account.current_bid;
+                                                });
+
+                                                push_virtual_operation(
+                                                    account_sale_operation(account.name,account.current_bid,account.current_bidder,account_seller.name));
+
+                                                public_key_type account_authorities_key(account.current_bidder_key);
+
+                                                const auto& account_auth = get<account_authority_object, by_account>(account.name);
+                                                modify(account_auth, [&](account_authority_object &auth) {
+                                                    auth.master.clear();
+                                                    auth.master.add_authority( account_authorities_key, 1 );
+                                                    auth.master.weight_threshold = 1;
+                                                    auth.active  = auth.master;
+                                                    auth.regular = auth.active;
+                                                    auth.last_master_update = head_block_time();
+                                                });
+
+                                                account.account_seller = "";
+                                                account.account_on_sale=false;
+                                                account.account_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.account_on_sale_start_time = fc::time_point_sec::min();
+
+                                                account.target_buyer = "";
+
+                                                account.account_on_auction=false;
+                                                account.current_bid = asset(0, TOKEN_SYMBOL);
+                                                account.current_bidder = "";
+                                                account.current_bidder_key = public_key_type();
+                                                account.last_bid = asset(0, TOKEN_SYMBOL);
+
+                                                account.subaccount_seller = "";
+                                                account.subaccount_offer_price = asset(0, TOKEN_SYMBOL);
+                                                account.subaccount_on_sale=false;
+
+                                                account.memo_key = account_authorities_key;
+                                                account.recovery_account = account_bidder.name;
+                                                account.last_account_update = head_block_time();
+                                            }
+                                        }
+                                        else{//imposible condition
+                                            //return reserve to bidder
+                                            modify(account_bidder, [&](account_object &ab) {
+                                                ab.reserved_balance -= account.current_bid;
+                                                ab.balance += account.current_bid;
+                                            });
+
+                                            push_virtual_operation(
+                                                outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                            account.account_on_auction=false;
+                                            account.current_bid = asset(0, TOKEN_SYMBOL);
+                                            account.current_bidder = "";
+                                            account.current_bidder_key = public_key_type();
+                                            account.last_bid = asset(0, TOKEN_SYMBOL);
+                                        }
+                                    }
+                                    else{//imposible condition
+                                        //return bid reserve to bidder
+                                        modify(account_bidder, [&](account_object &ab) {
+                                            ab.reserved_balance -= account.current_bid;
+                                            ab.balance += account.current_bid;
+                                        });
+
+                                        push_virtual_operation(
+                                            outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                        account.account_on_auction=false;
+                                        account.current_bid = asset(0, TOKEN_SYMBOL);
+                                        account.current_bidder = "";
+                                        account.current_bidder_key = public_key_type();
+                                        account.last_bid = asset(0, TOKEN_SYMBOL);
+                                    }
+                                }
+                                else{//if current bidder is not target buyer (imposible condition)
+                                    //return bid reserve to bidder
+                                    modify(account_bidder, [&](account_object &ab) {
+                                        ab.reserved_balance -= account.current_bid;
+                                        ab.balance += account.current_bid;
+                                    });
+
+                                    push_virtual_operation(
+                                        outbid_operation(account.name,account_bidder.name,account.current_bid));
+
+                                    account.account_on_auction=false;
+                                    account.current_bid = asset(0, TOKEN_SYMBOL);
+                                    account.current_bidder = "";
+                                    account.current_bidder_key = public_key_type();
+                                    account.last_bid = asset(0, TOKEN_SYMBOL);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
         time_point_sec database::head_block_time() const {
             return get_dynamic_global_properties().time;
         }
@@ -2592,6 +2932,8 @@ namespace graphene { namespace chain {
             _my->_evaluator_registry.register_evaluator<set_subaccount_price_evaluator>();
             _my->_evaluator_registry.register_evaluator<buy_account_evaluator>();
             _my->_evaluator_registry.register_evaluator<use_invite_balance_evaluator>();
+            _my->_evaluator_registry.register_evaluator<fixed_award_evaluator>();
+            _my->_evaluator_registry.register_evaluator<target_account_sale_evaluator>();
         }
 
         void database::set_custom_operation_interpreter(const std::string &id, std::shared_ptr<custom_operation_interpreter> registry) {
@@ -2639,6 +2981,7 @@ namespace graphene { namespace chain {
             add_core_index<paid_subscription_index>(*this);
             add_core_index<paid_subscribe_index>(*this);
             add_core_index<witness_penalty_expire_index>(*this);
+            add_core_index<block_post_validation_index>(*this);
 
             _plugin_index_signal();
         }
@@ -3001,6 +3344,11 @@ namespace graphene { namespace chain {
             return skip;
         }
 
+
+        public_key_type database::get_witness_key(const account_name_type& name) {
+            return get_witness(name).signing_key;
+        }
+
         void database::_validate_transaction(const signed_transaction &trx, uint32_t skip) {
             if (!(skip & skip_validate_operations)) {   /* issue #505 explains why this skip_flag is disabled */
                 trx.validate();
@@ -3155,7 +3503,7 @@ namespace graphene { namespace chain {
                 uint32_t next_block_num = next_block.block_num();
                 const auto &gprops = get_dynamic_global_properties();
                 const auto &hardfork_state = get_hardfork_property_object();
-                //block_id_type next_block_id = next_block.id();
+                block_id_type next_block_id = block_id_type(next_block.id());
 
                 _validate_block(next_block, skip);
 
@@ -3233,6 +3581,10 @@ namespace graphene { namespace chain {
                 account_recovery_processing();
                 expire_escrow_ratification();
 
+                if(has_hardfork(CHAIN_HARDFORK_11)){
+                    account_on_auction_expiration();
+                }
+
                 clear_null_account_balance();
                 clear_anonymous_account_balance();
                 claim_committee_account_balance();
@@ -3240,6 +3592,9 @@ namespace graphene { namespace chain {
                 committee_processing();
                 paid_subscribe_processing();
                 process_hardforks();
+
+                check_block_post_validation_chain();
+                create_block_post_validation(next_block_num,next_block_id,next_block.witness);
 
                 // notify observers that the block has been applied
                 notify_applied_block(next_block);
@@ -3517,6 +3872,254 @@ namespace graphene { namespace chain {
             } FC_CAPTURE_AND_RETHROW()
         }
 
+        //after block is applied check block post validation chain step by step
+        //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
+        void database::check_block_post_validation_chain(){
+            try {
+                const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+                if(!validation_list.empty()){
+                    const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+                    const witness_schedule_object &wso = get_witness_schedule_object();
+                    //ilog("! check_block_post_validation_chain = ${n}", ("n", validation_list.size()));
+                    auto itr = validation_list.begin();
+                    while(itr != validation_list.end())
+                    {
+                        bool remove_validated = false;
+                        const auto& current = *itr;
+                        itr++;
+                        if((1 + dpo.last_irreversible_block_num) == current.block_num){
+                            size_t count=0;
+                            for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                                if(current.current_shuffled_witnesses_validations[j] == true){//already validated
+                                    count++;
+                                }
+                            }
+                            if(count >= (size_t(wso.num_scheduled_witnesses) * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
+                                modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                    _dpo.last_irreversible_block_num = current.block_num;
+                                    _dpo.last_irreversible_block_id = block_id_type();
+                                    _dpo.last_irreversible_block_ref_num = 0;
+                                    _dpo.last_irreversible_block_ref_prefix = 0;
+                                });
+
+                                commit(dpo.last_irreversible_block_num);
+
+                                // output to block log based on new last irreverisible block num
+                                const auto &tmp_head = _block_log.head();
+                                uint64_t log_head_num = 0;
+
+                                if (tmp_head) {
+                                    log_head_num = tmp_head->block_num();
+                                }
+
+                                if (log_head_num < dpo.last_irreversible_block_num) {
+                                    while (log_head_num < dpo.last_irreversible_block_num) {
+                                        std::shared_ptr<fork_item> block = _fork_db.fetch_block_on_main_branch_by_number(
+                                                log_head_num + 1);
+                                        FC_ASSERT(block, "Current fork in the fork database does not contain the last_irreversible_block");
+                                        _block_log.append(block->data);
+                                        log_head_num++;
+                                    }
+
+                                    _block_log.flush();
+                                }
+
+                                //modify dpo after block log commit
+                                if (current.block_num == dpo.last_irreversible_block_num) {
+                                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                                        if (irreversible_block.valid()) {
+                                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                                        }
+                                    });
+                                }
+
+                                _fork_db.set_max_size(dpo.head_block_number -
+                                                    dpo.last_irreversible_block_num + 1);
+                                remove_validated=true;
+                            }
+                        }
+                        if(remove_validated){
+                            remove(current);
+                        }
+                    }
+                }
+            } FC_CAPTURE_AND_RETHROW()
+        }
+
+        //p2p plugin check witness signature on handle_message
+        //and apply block post validation for block id by witness account
+        //if count of validation is more than 2/3 of witnesses, then update last irreversible block num
+        void database::apply_block_post_validation(block_id_type block_id, const account_name_type &witness_account){
+            try {
+                const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+                if(!validation_list.empty()){
+                    auto itr = validation_list.begin();
+                    bool find = false;
+                    uint32_t find_block_num = 0;
+                    auto find_obj = *itr;
+                    size_t count = 0;
+                    while(itr != validation_list.end())
+                    {
+                        const auto& current = *itr;
+                        if(current.block_id == block_id){
+                            find_block_num = current.block_num;
+                            modify(current, [&](block_post_validation_object &o) {
+                                //remove witness from shuffled witnesses
+                                for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                                    if(o.current_shuffled_witnesses[j] == witness_account){
+                                        o.current_shuffled_witnesses_validations[j] = true;
+                                        //need update
+                                        find = true;
+                                        find_obj=*itr;
+                                    }
+                                    if(o.current_shuffled_witnesses_validations[j] == true){//already validated
+                                        count++;
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                        ++itr;
+                    }
+                    if(find){
+                        const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+                        if((1 + dpo.last_irreversible_block_num) == find_block_num){
+                            const witness_schedule_object &wso = get_witness_schedule_object();
+                            if(count >= (size_t(wso.num_scheduled_witnesses) * CHAIN_IRREVERSIBLE_THRESHOLD / CHAIN_100_PERCENT)){
+                                modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                    _dpo.last_irreversible_block_num = find_block_num;
+                                    _dpo.last_irreversible_block_id = block_id_type();
+                                    _dpo.last_irreversible_block_ref_num = 0;
+                                    _dpo.last_irreversible_block_ref_prefix = 0;
+                                });
+
+                                commit(dpo.last_irreversible_block_num);
+
+                                // output to block log based on new last irreverisible block num
+                                const auto &tmp_head = _block_log.head();
+                                uint64_t log_head_num = 0;
+
+                                if (tmp_head) {
+                                    log_head_num = tmp_head->block_num();
+                                }
+
+                                if (log_head_num < dpo.last_irreversible_block_num) {
+                                    while (log_head_num < dpo.last_irreversible_block_num) {
+                                        std::shared_ptr<fork_item> block = _fork_db.fetch_block_on_main_branch_by_number(
+                                                log_head_num + 1);
+                                        FC_ASSERT(block, "Current fork in the fork database does not contain the last_irreversible_block");
+                                        _block_log.append(block->data);
+                                        log_head_num++;
+                                    }
+
+                                    _block_log.flush();
+                                }
+
+                                //modify dpo after block log commit
+                                if (find_block_num == dpo.last_irreversible_block_num) {
+                                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                                        if (irreversible_block.valid()) {
+                                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                                        }
+                                    });
+                                }
+
+                                _fork_db.set_max_size(dpo.head_block_number -
+                                                    dpo.last_irreversible_block_num + 1);
+                            }
+                        }
+                    }
+                }
+            } FC_CAPTURE_AND_RETHROW()
+        }
+
+        //get block post validation objects for witness
+        //return array of block_post_validation_object event if it is empty
+        std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> database::get_block_post_validations(const account_name_type &witness_account){
+            std::array<block_post_validation_object, CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT> result;
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            auto itr = validation_list.begin();
+            size_t i = 0;
+            while(itr != validation_list.end())
+            {
+                const auto& current = *itr;
+                ++itr;
+                //if witness is in the list add it to result
+                for (size_t j = 0; j< CHAIN_MAX_WITNESSES; j++) {
+                    if(current.current_shuffled_witnesses[j] == witness_account){
+                        if(current.current_shuffled_witnesses_validations[j] == false){//need validate
+                            result[i] = block_post_validation_object(current);
+                            ++i;
+                        }
+                    }
+                }
+            }
+            //fill result with empty objects to return array with fixed size
+            for(; i < CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT; i++){
+                result[i] = block_post_validation_object();
+            }
+            return result;
+        }
+
+        //create block post validation object with current shuffled witnesses
+        //remove old block post validation objects
+        //remove old blocks from post validation list if it is full (CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT)
+        void database::create_block_post_validation(uint32_t block_num, block_id_type block_id, const account_name_type& witness_account){
+            const dynamic_global_property_object &dpo = get_dynamic_global_properties();
+            //remove blocks if they height is less than last irreversible block
+            const auto& validation_list = get_index<block_post_validation_index>().indices().get<by_id>();
+            auto itr1 = validation_list.begin();
+            while(itr1 != validation_list.end())
+            {
+                const auto& current = *itr1;
+                ++itr1;
+                if(current.block_num <= dpo.last_irreversible_block_num){
+                    remove(current);
+                }
+            }
+            //remove old blocks from post validation list if it is full
+            const auto& validation_list2 = get_index<block_post_validation_index>().indices().get<by_id>();
+            size_t max_block_post_validation_size = 0;
+            auto first=validation_list2.begin();
+            for (auto itr = validation_list2.begin();
+                    itr != validation_list2.end();
+                    ++itr) {
+                max_block_post_validation_size++;
+                if(max_block_post_validation_size >= CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT) {
+                    const auto& first_item = *first;
+                    first++;
+                    remove(first_item);//remove first element, oldest block
+                }
+            }
+            //create new block in post validation list
+            create<block_post_validation_object>([&](block_post_validation_object& o) {
+                o.block_num = block_num;
+                o.block_id = block_id_type(block_id);
+                const witness_schedule_object &wso = get_witness_schedule_object();
+                size_t witness_index=0;
+                size_t i = 0;
+                for (; i < wso.num_scheduled_witnesses; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                    if(witness_account != wso.current_shuffled_witnesses[i]){
+                        o.current_shuffled_witnesses[witness_index] = account_name_type(wso.current_shuffled_witnesses[i]);
+                        o.current_shuffled_witnesses_validations[witness_index] = false;
+                        witness_index++;
+                    }
+                }
+                for (; i < CHAIN_MAX_WITNESSES; i+=CHAIN_BLOCK_WITNESS_REPEAT) {
+                    o.current_shuffled_witnesses[i] = account_name_type();
+                    o.current_shuffled_witnesses_validations[i] = false;
+                }
+            });
+        }
+
         void database::update_signing_witness(const witness_object &signing_witness, const signed_block &new_block) {
             try {
                 const dynamic_global_property_object &dpo = get_dynamic_global_properties();
@@ -3569,6 +4172,9 @@ namespace graphene { namespace chain {
                     dpo.last_irreversible_block_num) {
                     modify(dpo, [&](dynamic_global_property_object &_dpo) {
                         _dpo.last_irreversible_block_num = new_last_irreversible_block_num;
+                        _dpo.last_irreversible_block_id = block_id_type();
+                        _dpo.last_irreversible_block_ref_num = 0;
+                        _dpo.last_irreversible_block_ref_prefix = 0;
                     });
                 }
 
@@ -3594,6 +4200,19 @@ namespace graphene { namespace chain {
 
                         _block_log.flush();
                     }
+                }
+
+                //modify dpo after block log commit
+                if (new_last_irreversible_block_num == dpo.last_irreversible_block_num) {
+                    modify(dpo, [&](dynamic_global_property_object &_dpo) {
+                        auto irreversible_block = _block_log.read_block_by_num(_dpo.last_irreversible_block_num);
+                        if (irreversible_block.valid()) {
+                            _dpo.last_irreversible_block_id = irreversible_block->id();
+
+                            _dpo.last_irreversible_block_ref_num = _dpo.last_irreversible_block_num & 0xFFFF;
+                            _dpo.last_irreversible_block_ref_prefix= _dpo.last_irreversible_block_id._hash[1];
+                        }
+                    });
                 }
 
                 _fork_db.set_max_size(dpo.head_block_number -
@@ -3740,6 +4359,9 @@ namespace graphene { namespace chain {
 
             _hardfork_times[CHAIN_HARDFORK_10] = fc::time_point_sec(CHAIN_HARDFORK_10_TIME);
             _hardfork_versions[CHAIN_HARDFORK_10] = CHAIN_HARDFORK_10_VERSION;
+
+            _hardfork_times[CHAIN_HARDFORK_11] = fc::time_point_sec(CHAIN_HARDFORK_11_TIME);
+            _hardfork_versions[CHAIN_HARDFORK_11] = CHAIN_HARDFORK_11_VERSION;
 
             const auto &hardforks = get_hardfork_property_object();
             FC_ASSERT(
@@ -4550,6 +5172,49 @@ namespace graphene { namespace chain {
                         const auto &current = *itr;
                         ++itr;
                         if(0==current.last_confirmed_block_num){
+                            //MUST be corrected: the witness_vote_object must also be deleted
+                            //remove invalid witness account from penalty index
+                            const auto &d8idx = get_index<witness_penalty_expire_index>().indices().get<by_account>();
+                            auto delete_itr8 = d8idx.lower_bound(current.owner);
+                            while(delete_itr8 != d8idx.end() &&
+                                    delete_itr8->witness == current.owner) {
+                                const auto &delete_current = *delete_itr8;
+                                ++delete_itr8;
+                                remove(delete_current);
+                            }
+                            //recalc witnesses_vote_weight from all votes to invalid witness account (remove votes to invalid witness account)
+                            const auto &vidx = get_index<witness_vote_index>().indices().get<by_witness_account>();
+                            auto vitr = vidx.lower_bound(boost::make_tuple(current.id, account_id_type()));
+                            while (vitr != vidx.end() && vitr->witness == current.id) {
+                                const auto &voter_account = get(vitr->account);
+                                const auto &vidx2 = get_index<witness_vote_index>().indices().get<by_account_witness>();
+                                auto vitr2 = vidx2.lower_bound(boost::make_tuple(voter_account.id, witness_id_type()));
+                                while (vitr2 != vidx2.end() && vitr2->account == voter_account.id) {
+                                    adjust_witness_vote(get(vitr2->witness), -voter_account.witnesses_vote_weight);
+                                    ++vitr2;
+                                }
+
+                                remove(*vitr);
+
+                                modify(voter_account, [&](account_object &a) {
+                                    a.witnesses_voted_for--;
+                                    a.valid=false;
+                                });
+
+                                share_type fair_vote_weight = voter_account.witness_vote_fair_weight();
+                                modify(voter_account, [&](account_object &a) {
+                                    a.witnesses_vote_weight = fair_vote_weight;
+                                });
+
+                                const auto &vidx3 = get_index<witness_vote_index>().indices().get<by_account_witness>();
+                                auto vitr3 = vidx3.lower_bound(boost::make_tuple(voter_account.id, witness_id_type()));
+                                while (vitr3 != vidx3.end() && vitr3->account == voter_account.id) {
+                                    adjust_witness_vote(get(vitr3->witness), voter_account.witnesses_vote_weight);
+                                    ++vitr3;
+                                }
+                                ++vitr;
+                            }
+                            elog("HF9 remove empty/spam witness ${a}", ("a", current.owner));
                             remove(current);
                         }
                     }
@@ -4590,6 +5255,23 @@ namespace graphene { namespace chain {
                 }
                 case CHAIN_HARDFORK_10:
                     break;
+                case CHAIN_HARDFORK_11:
+                {
+                    //fixed error from CHAIN_HARDFORK_9 by replay, but need toggle flag valid for spam accounts
+                    const auto &eidx = get_index<account_index>().indices().get<by_id>();
+                    auto itr = eidx.begin();
+                    while(itr != eidx.end()){
+                        const auto &current = *itr;
+                        ++itr;
+                        if(!current.valid){
+                            //toggle invalid accounts to valid
+                            modify(current, [&](account_object &a) {
+                                a.valid=true;
+                            });
+                        }
+                    }
+                    break;
+                }
                 default:
                     break;
             }

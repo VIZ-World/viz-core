@@ -2,7 +2,7 @@
 
 #define CHAIN_STARTUP_VERSION                 (version(1, 0, 0))
 #define CHAIN_HARDFORK_STARTUP_VERSION        (hardfork_version(CHAIN_STARTUP_VERSION))
-#define CHAIN_VERSION                         (version(2, 6, 0))
+#define CHAIN_VERSION                         (version(3, 0, 0))
 #define CHAIN_HARDFORK_VERSION                (hardfork_version(CHAIN_VERSION))
 
 #define CHAIN_NAME                            "VIZ"
@@ -40,6 +40,7 @@
 #define CHAIN_MAX_SUPPORT_WITNESSES           10
 #define CHAIN_MAX_WITNESSES                   (CHAIN_MAX_TOP_WITNESSES+CHAIN_MAX_SUPPORT_WITNESSES) /// 21 is more than enough
 #define CHAIN_HARDFORK_REQUIRED_WITNESSES     17 // 17 of the 20 dpos witnesses (19 elected and 1 virtual time) required for hardfork. This guarantees 75% participation on all subsequent rounds.
+#define CHAIN_MAX_BLOCK_POST_VALIDATION_COUNT 20
 #define CHAIN_MAX_TIME_UNTIL_EXPIRATION       (60*60) // seconds,  aka: 1 hour
 #define CHAIN_MAX_PROXY_RECURSION_DEPTH       4
 #define CHAIN_VESTING_WITHDRAW_INTERVALS      28
@@ -61,6 +62,7 @@
 #define CHAIN_VESTING_FUND_PERCENT            (10*CHAIN_1_PERCENT) //10% of inflation
 #define CHAIN_REWARD_FUND_PERCENT             (35*CHAIN_1_PERCENT) //35% of inflation
 #define CHAIN_COMMITTEE_FUND_PERCENT          (35*CHAIN_1_PERCENT) //35% of inflation
+#define CHAIN_DIGITAL_ASSET_ISSUED_PER_BLOCK  int64_t(1000) //1.000 viz (new emission of digital asset per block)
 
 #define CHAIN_CONSENSUS_INFLATION_WITNESS_PERCENT (20*CHAIN_1_PERCENT) //20% of inflation
 #define CHAIN_CONSENSUS_INFLATION_RATIO       (50*CHAIN_1_PERCENT) //default: 50% of inflation minus witness percent (80% split between committee and reward fund)
@@ -108,6 +110,10 @@
 #define CHAIN_IRREVERSIBLE_THRESHOLD          (75 * CHAIN_1_PERCENT)
 /** Irreversibility only counts blocks produced if wit.current_run >= CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN */
 #define CHAIN_IRREVERSIBLE_SUPPORT_MIN_RUN    2
+
+#define CHAIN_ACCOUNT_AUCTION_MIN_STEP        (CHAIN_100_PERCENT/10) // 10%
+#define CHAIN_ACCOUNT_AUCTION_EXTENSION_TIME  fc::minutes(5)
+
 #define COMMITTEE_MIN_DURATION                (60*60*24*5)
 #define COMMITTEE_MAX_DURATION                (60*60*24*30)
 #define COMMITTEE_MAX_REQUIRED_AMOUNT         int64_t(CHAIN_INIT_SUPPLY/100)

@@ -76,6 +76,7 @@ namespace graphene { namespace plugins { namespace account_history {
         void plugin_initialize(const boost::program_options::variables_map &options) override;
         void plugin_startup() override;
         void plugin_shutdown() override;
+        void purge_old_history();
 
         fc::flat_map<std::string, std::string> tracked_accounts() const; /// map start_range to end_range
 

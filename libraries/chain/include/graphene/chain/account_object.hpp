@@ -125,7 +125,17 @@ public:
     account_name_type account_seller;
     asset account_offer_price = asset(0, TOKEN_SYMBOL);
     bool account_on_sale = false;
-    time_point_sec account_on_sale_start_time = fc::time_point_sec::min();
+    time_point_sec account_on_sale_start_time = fc::time_point_sec::min();//extend on new bid to max(now+5min,account_on_sale_start_time)
+
+    asset reserved_balance = asset(0, TOKEN_SYMBOL);//locked by operations with expiration
+
+    account_name_type target_buyer;//set target buyer, without auction
+
+    bool account_on_auction = false;
+    asset current_bid = asset(0, TOKEN_SYMBOL);//next bid must be >= max(account_offer_price/10,current_bid-last_bid)
+    account_name_type current_bidder;
+    public_key_type current_bidder_key;
+    asset last_bid = asset(0, TOKEN_SYMBOL);
 
     account_name_type subaccount_seller;
     asset subaccount_offer_price = asset(0, TOKEN_SYMBOL);
@@ -271,6 +281,8 @@ public:
 struct by_name;
 struct by_next_vesting_withdrawal;
 struct by_account_on_sale;
+struct by_account_on_auction;
+struct by_account_on_sale_start_time;
 struct by_subaccount_on_sale;
 
 /**
@@ -283,6 +295,10 @@ typedef multi_index_container<
                         member<account_object, account_id_type, &account_object::id> >,
                 ordered_non_unique<tag<by_account_on_sale>,
                         member<account_object, bool, &account_object::account_on_sale> >,
+                ordered_non_unique<tag<by_account_on_auction>,
+                        member<account_object, bool, &account_object::account_on_auction> >,
+                ordered_non_unique<tag<by_account_on_sale_start_time>,
+                        member<account_object, time_point_sec, &account_object::account_on_sale_start_time> >,
                 ordered_non_unique<tag<by_subaccount_on_sale>,
                         member<account_object, bool, &account_object::subaccount_on_sale> >,
                 ordered_unique<tag<by_name>,
@@ -509,6 +525,8 @@ FC_REFLECT((graphene::chain::account_object),
                 (average_bandwidth)(lifetime_bandwidth)(last_bandwidth_update)
                 (valid)
                 (account_seller)(account_offer_price)(account_on_sale)(account_on_sale_start_time)
+                (reserved_balance)
+                (target_buyer)(account_on_auction)(current_bid)(current_bidder)(current_bidder_key)(last_bid)
                 (subaccount_seller)(subaccount_offer_price)(subaccount_on_sale)
 )
 CHAINBASE_SET_INDEX_TYPE(graphene::chain::account_object, graphene::chain::account_index)

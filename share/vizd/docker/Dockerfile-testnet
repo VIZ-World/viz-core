@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.19 as builder
+FROM phusion/baseimage:bionic-1.0.0 as builder
 
 ENV LANG=en_US.UTF-8
 ENV APPDIR /usr/local/src/viz/
@@ -10,12 +10,13 @@ RUN \
         autoconf \
         automake \
         autotools-dev \
+        binutils \
         bsdmainutils \
         build-essential \
         cmake \
         doxygen \
         git \
-        ccache\
+        ccache \
         libboost-all-dev \
         libreadline-dev \
         libssl-dev \
@@ -58,7 +59,12 @@ RUN set -xe ;\
     make install ;\
     rm -rf $APPDIR
 
-FROM phusion/baseimage:0.9.19
+RUN \
+    apt-get clean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
+
+FROM phusion/baseimage:bionic-1.0.0 as production
 COPY --from=builder /usr/local /usr/local
 
 RUN set -xe ;\

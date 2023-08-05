@@ -9,6 +9,8 @@ namespace graphene { namespace chain {
 
     void create_invite_evaluator::do_apply(const create_invite_operation& o) {
         const auto& creator = _db.get_account(o.creator);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!creator.valid, "Account flagged as invalid");
         const auto& median_props = _db.get_witness_schedule_object().median_props;
 
         FC_ASSERT(creator.balance >= o.balance, "Insufficient balance to create invite.",
@@ -36,7 +38,12 @@ namespace graphene { namespace chain {
     }
 
     void claim_invite_balance_evaluator::do_apply(const claim_invite_balance_operation& o) {
+        const auto& initiator = _db.get_account(o.initiator);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!initiator.valid, "Account flagged as invalid");
         const auto& receiver = _db.get_account(o.receiver);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!receiver.valid, "Account flagged as invalid");
         FC_ASSERT(o.invite_secret.size(), "Invite secret cannot be blank.");
 
         fc::optional<fc::ecc::private_key> invite_secret = graphene::utilities::wif_to_key(o.invite_secret);
@@ -66,6 +73,10 @@ namespace graphene { namespace chain {
 
     void invite_registration_evaluator::do_apply(const invite_registration_operation& o) {
         FC_ASSERT(o.invite_secret.size(), "Invite secret cannot be blank.");
+
+        const auto& initiator = _db.get_account(o.initiator);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!initiator.valid, "Account flagged as invalid");
 
         fc::optional<fc::ecc::private_key> invite_secret = graphene::utilities::wif_to_key(o.invite_secret);
         FC_ASSERT(invite_secret, "Invite secret must be WIF.");
@@ -114,8 +125,15 @@ namespace graphene { namespace chain {
 
     void use_invite_balance_evaluator::do_apply(const use_invite_balance_operation& o) {
         FC_ASSERT( _db.has_hardfork(CHAIN_HARDFORK_9), "use_invite_balance not enabled until HF 9" );
+        const auto& initiator = _db.get_account(o.initiator);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!initiator.valid, "Account flagged as invalid");
         const auto& receiver = _db.get_account(o.receiver);
+        //if(_db.has_hardfork(CHAIN_HARDFORK_9))//can be deleted after fix in CHAIN_HARDFORK_11
+        //    FC_ASSERT(!receiver.valid, "Account flagged as invalid");
         FC_ASSERT(o.invite_secret.size(), "Invite secret cannot be blank.");
+
+
 
         fc::optional<fc::ecc::private_key> invite_secret = graphene::utilities::wif_to_key(o.invite_secret);
         FC_ASSERT(invite_secret, "Invite secret must be WIF.");

@@ -1077,6 +1077,36 @@ namespace graphene { namespace protocol {
                 a.insert(initiator);
             }
         };
+
+        struct fixed_award_operation : public base_operation {
+            account_name_type initiator;
+            account_name_type receiver;
+            asset reward_amount;
+            uint16_t max_energy = 0;
+            uint64_t custom_sequence = 0;
+            string memo;
+            vector <beneficiary_route_type> beneficiaries;
+
+            void validate() const;
+
+            void get_required_regular_authorities(flat_set<account_name_type> &a) const {
+                a.insert(initiator);
+            }
+        };
+
+        struct target_account_sale_operation : public base_operation {
+            account_name_type account;
+            account_name_type account_seller;
+            account_name_type target_buyer;
+            asset account_offer_price;
+            bool account_on_sale;
+
+            void validate() const;
+
+            void get_required_master_authorities(flat_set<account_name_type> &a) const {
+                a.insert(account);
+            }
+        };
 } } // graphene::protocol
 
 
@@ -1154,3 +1184,5 @@ FC_REFLECT((graphene::protocol::set_account_price_operation), (account)(account_
 FC_REFLECT((graphene::protocol::set_subaccount_price_operation), (account)(subaccount_seller)(subaccount_offer_price)(subaccount_on_sale));
 FC_REFLECT((graphene::protocol::buy_account_operation), (buyer)(account)(account_offer_price)(account_authorities_key)(tokens_to_shares));
 FC_REFLECT((graphene::protocol::use_invite_balance_operation), (initiator)(receiver)(invite_secret));
+FC_REFLECT((graphene::protocol::fixed_award_operation), (initiator)(receiver)(reward_amount)(max_energy)(custom_sequence)(memo)(beneficiaries));
+FC_REFLECT((graphene::protocol::target_account_sale_operation), (account)(account_seller)(target_buyer)(account_offer_price)(account_on_sale));
