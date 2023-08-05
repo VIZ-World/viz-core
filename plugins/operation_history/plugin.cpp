@@ -98,14 +98,17 @@ namespace graphene { namespace plugins { namespace operation_history {
 
         void purge_old_history(){
             uint32_t head_block = database.head_block_num();
+            //ilog("operation_history: purge_old_history START ${c} <= ${h}", ("c",history_count_blocks)("h", head_block));
             if (history_count_blocks <= head_block) {
-                uint32_t need_block = head_block - history_count_blocks + 1;
-                const auto& idx = database.get_index<operation_index>().indices().get<by_location>();
+                uint32_t need_block = head_block - history_count_blocks;
+                const auto& idx = database.get_index<operation_index>().indices().get<by_block>();
                 auto it = idx.begin();
                 while (it != idx.end() && it->block <= need_block) {
-                    auto current = *it;
-                    ++it;
-                    database.remove(current);
+                    auto next_it = it;
+                    ++next_it;
+                    //ilog("operation_history: REMOVE ${c}", ("c",it->block));
+                    database.remove(*it);
+                    it = next_it;
                 }
             }
         }

@@ -77,14 +77,17 @@ if( options.count(name) ) { \
 
         void purge_old_history(){
             uint32_t head_block = database.head_block_num();
+            //ilog("account_history: purge_old_history START ${c} <= ${h}", ("c",history_count_blocks)("h", head_block));
             if (history_count_blocks <= head_block) {
-                uint32_t need_block = head_block - history_count_blocks + 1;
+                uint32_t need_block = head_block - history_count_blocks;
                 const auto& idx = database.get_index<account_history_index>().indices().get<by_block>();
                 auto it = idx.begin();
                 while (it != idx.end() && it->block <= need_block) {
-                    auto current = *it;
-                    ++it;
-                    database.remove(current);
+                    auto next_it = it;
+                    ++next_it;
+                    //ilog("account_history: REMOVE ${c}", ("c",it->block));
+                    database.remove(*it);
+                    it = next_it;
                 }
             }
         }
@@ -418,10 +421,6 @@ if( options.count(name) ) { \
             boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
             "Defines a range of accounts to track as a json pair [\"from\",\"to\"] [from,to]. "
             "Can be specified multiple times"
-        ) (
-            "history-count-blocks",
-            boost::program_options::value<uint32_t>(),
-            "Defines depth of history for recording stats."
         );
         cfg.add(cli);
     }

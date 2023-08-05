@@ -60,6 +60,7 @@ namespace graphene { namespace plugins { namespace operation_history {
     using operation_id_type = object_id<operation_object>;
 
     struct by_location;
+    struct by_block;
     struct by_transaction_id;
     using operation_index = multi_index_container<
         operation_object,
@@ -67,6 +68,9 @@ namespace graphene { namespace plugins { namespace operation_history {
             ordered_unique<
                 tag<by_id>,
                 member<operation_object, operation_id_type, &operation_object::id>>,
+            ordered_non_unique<
+                tag<by_block>,
+                member<operation_object, uint32_t, &operation_object::block>>,
             ordered_unique<
                 tag<by_location>,
                 composite_key<
@@ -89,4 +93,3 @@ namespace graphene { namespace plugins { namespace operation_history {
 CHAINBASE_SET_INDEX_TYPE(
     graphene::plugins::operation_history::operation_object,
     graphene::plugins::operation_history::operation_index)
-
