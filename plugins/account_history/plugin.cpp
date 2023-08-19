@@ -64,6 +64,21 @@ if( options.count(name) ) { \
                 history.sequence = sequence;
                 history.op = operation_history::operation_id_type(note.db_id);
             });
+
+            const auto& idx_range = database.get_index<account_range_index>().indices().get<range_by_account>();
+            auto itr_range = idx_range.find(account);
+            if(itr_range == idx_range.end()){
+                database.create<account_range_object>([&](account_range_object& range) {
+                    range.account = account;
+                    range.start_sequence = sequence;
+                    range.end_sequence = sequence;
+                });
+            }
+            else{
+                database.modify(*itr_range, [&](account_range_object& range) {
+                    range.end_sequence = sequence;
+                });
+            }
         }
     };
 
@@ -83,6 +98,24 @@ if( options.count(name) ) { \
                 const auto& idx = database.get_index<account_history_index>().indices().get<by_block>();
                 auto it = idx.begin();
                 while (it != idx.end() && it->block <= need_block) {
+                    //change account range object if needed
+                    const auto& idx_range = database.get_index<account_range_index>().indices().get<range_by_account>();
+                    auto itr_range = idx_range.find(it->account);
+                    if(itr_range != idx_range.end()){
+                        if(itr_range->start_sequence <= it->sequence){
+                            //remove account range object if it have one sequence in range
+                            if(itr_range->start_sequence == itr_range->end_sequence){
+                                database.remove(*itr_range);
+                            }
+                            else{
+                                //edit start sequence
+                                database.modify(*itr_range, [&](account_range_object& range) {
+                                    range.start_sequence++;
+                                });
+                            }
+                        }
+                    }
+
                     auto next_it = it;
                     ++next_it;
                     //ilog("account_history: REMOVE ${c}", ("c",it->block));
@@ -115,10 +148,20 @@ if( options.count(name) ) { \
 
         std::map<uint32_t, applied_operation> get_account_history(
             std::string account,
-            uint64_t from,
+            uint32_t from,
             uint32_t limit
         ) {
-            FC_ASSERT(limit <= 10000, "Limit of ${l} is greater than maxmimum allowed", ("l", limit));
+            //new account range index to prevent search unavailable "FROM" in account_history_index
+            const auto& idx_range = database.get_index<account_range_index>().indices().get<range_by_account>();
+            auto itr_range = idx_range.find(account);
+            FC_ASSERT(itr_range != idx_range.end(), "Account not found in history index, it may have been purged since the last  ${b} blocks are stored in the history", ("b", history_count_blocks));
+            if(from != UINT32_MAX){
+                FC_ASSERT(from >= itr_range->start_sequence, "From is less than account history start sequence ${s}", ("s", itr_range->start_sequence));
+                FC_ASSERT(from <= itr_range->end_sequence, "From is greater than account history end sequence ${s}", ("s", itr_range->end_sequence));
+            }
+
+            //changed to 1000 after long jsonrpc requests, that use read lock
+            FC_ASSERT(limit <= 1000, "Limit of ${l} is greater than maxmimum allowed (1000)", ("l", limit));
             FC_ASSERT(from >= limit, "From must be greater than limit");
             //   idump((account)(from)(limit));
             const auto& idx = database.get_index<account_history_index>().indices().get<by_account>();
@@ -142,7 +185,7 @@ if( options.count(name) ) { \
     DEFINE_API(plugin, get_account_history) {
         CHECK_ARG_SIZE(3)
         auto account = args.args->at(0).as<std::string>();
-        auto from = args.args->at(1).as<uint64_t>();
+        auto from = args.args->at(1).as<uint32_t>();
         auto limit = args.args->at(2).as<uint32_t>();
 
         return pimpl->database.with_weak_read_lock([&]() {
@@ -446,6 +489,7 @@ if( options.count(name) ) { \
         });
 
         graphene::chain::add_plugin_index<account_history_index>(pimpl->database);
+        graphene::chain::add_plugin_index<account_range_index>(pimpl->database);
 
         using pairstring = std::pair<std::string, std::string>;
         LOAD_VALUE_SET(options, "track-account-range", pimpl->tracked_accounts, pairstring);
