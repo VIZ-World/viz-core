@@ -32,13 +32,46 @@
 namespace graphene { namespace plugins { namespace account_history {
 
     enum account_object_types {
-        account_history_object_type = (ACCOUNT_HISTORY_SPACE_ID << 8)
+        account_history_object_type = (ACCOUNT_HISTORY_SPACE_ID << 8),
+        account_range_object_type = (ACCOUNT_HISTORY_SPACE_ID << 8) +1
     };
 
     using namespace graphene::chain;
     using namespace chainbase;
 
     using graphene::plugins::operation_history::operation_id_type;
+
+    class account_range_object final: public object<account_range_object_type, account_range_object> {
+    public:
+        template <typename Constructor, typename Allocator>
+        account_range_object(Constructor &&c, allocator <Allocator> a) {
+            c(*this);
+        }
+
+        id_type id;
+
+        account_name_type account;
+        uint32_t start_sequence = 0;
+        uint32_t end_sequence = 0;
+    };
+
+    using account_range_id_type = object_id<account_range_object>;
+
+    struct range_by_account;
+    using account_range_index = multi_index_container<
+        account_range_object,
+        indexed_by<
+            ordered_unique<
+                tag<by_id>,
+                member<account_range_object, account_range_id_type, &account_range_object::id>
+            >,
+            ordered_unique<
+                tag<range_by_account>,
+                member<account_range_object, account_name_type, &account_range_object::account>
+            >
+        >,
+        allocator<account_range_object>
+    >;
 
     class account_history_object final: public object<account_history_object_type, account_history_object> {
     public:
@@ -76,6 +109,10 @@ namespace graphene { namespace plugins { namespace account_history {
         allocator<account_history_object>>;
 
 } } } // graphene::plugins::account_history
+
+CHAINBASE_SET_INDEX_TYPE(
+    graphene::plugins::account_history::account_range_object,
+    graphene::plugins::account_history::account_range_index)
 
 CHAINBASE_SET_INDEX_TYPE(
     graphene::plugins::account_history::account_history_object,
